@@ -1,6 +1,288 @@
+# test version for fix issue sat timer ,implement threading , start button and reset button is not working
+import tkinter as tk
+from ttkbootstrap import Style, ttk
+from tkinter import messagebox
+import os
+import threading
+import queue
+import time
 import simpleaudio as sa
-#play wav file 
-wave_obj = sa.WaveObject.from_wave_file("/mnt/88c49251-2b3d-489c-be49-24b3d296dd4b/project_decdo/Promodomo/rest.wav")
-play_obj = wave_obj.play()
-play_obj.wait_done()  # Wait for sound to finish playing
-# this is for test and deguuging code in sctiions
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from collections import deque
+import datetime
+import json
+
+class PomodoroTimer:
+    def __init__(self):
+        self.load_settings()
+        self.current_time = self.pomodoro_time
+        self.timer_running = False
+        self.pomodoro_count = 0
+        self.mode = "Pomodoro"
+        self.total_pomodoro_time = 0
+        self.historical_data = self.load_historical_data()
+
+    def load_settings(self):
+        try:
+            with open('settings.json', 'r') as f:
+                settings = json.load(f)
+                self.pomodoro_time = settings['pomodoro'] * 60
+                self.short_break_time = settings['short_break'] * 60
+                self.long_break_time = settings['long_break'] * 60
+        except FileNotFoundError:
+            self.pomodoro_time = 25 * 60
+            self.short_break_time = 5 * 60
+            self.long_break_time = 15 * 60
+
+    def get_mode_time(self):
+        return {
+            "Pomodoro": self.pomodoro_time,
+            "Short Break": self.short_break_time,
+            "Long Break": self.long_break_time
+        }.get(self.mode, self.pomodoro_time)
+
+    def load_historical_data(self):
+        try:
+            with open('pomodoro_history.json', 'r') as f:
+                data = json.load(f)
+                return deque([(datetime.date.fromisoformat(d), count) for d, count in data], maxlen=7)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return deque(maxlen=7)
+
+    def save_historical_data(self):
+        data = [(d.isoformat(), count) for d, count in self.historical_data]
+        with open('pomodoro_history.json', 'w') as f:
+            json.dump(data, f)
+
+    def save_settings(self):
+        settings = {
+            'pomodoro': self.pomodoro_time // 60,
+            'short_break': self.short_break_time // 60,
+            'long_break': self.long_break_time // 60
+        }
+        with open('settings.json', 'w') as f:
+            json.dump(settings, f)
+
+class PomodoroTimerGUI:
+    def __init__(self, master):
+        self.master = master
+        self.timer = PomodoroTimer()
+        self.setup_gui()
+        self.pomodoro_sound = os.path.join(os.path.dirname(__file__), 'work.wav')
+        self.break_sound = os.path.join(os.path.dirname(__file__), 'rest.wav')
+        
+        self.timer_queue = queue.Queue()
+        self.timer_thread = None
+        self.is_running = True
+
+        # Set up the protocol for window closing
+        self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
+    def setup_gui(self):
+        self.master.title("Pomodoro Timer")
+        self.master.geometry("300x550")
+        self.master.resizable(False, False)
+
+        self.style = Style(theme='darkly')
+
+        self.timer_label = ttk.Label(self.master, text=self.format_time(self.timer.current_time), font=("Helvetica", 48))
+        self.timer_label.pack(pady=20)
+
+        self.start_button = ttk.Button(self.master, text="Start", command=self.toggle_timer)
+        self.start_button.pack(pady=10)
+
+        self.reset_button = ttk.Button(self.master, text="Reset", command=self.reset_timer)
+        self.reset_button.pack(pady=10)
+
+        self.mode_var = tk.StringVar(value="Pomodoro")
+        self.mode_menu = ttk.OptionMenu(self.master, self.mode_var, "Pomodoro", "Pomodoro", "Short Break", "Long Break", command=self.change_mode)
+        self.mode_menu.pack(pady=10)
+
+        self.progress_bar = ttk.Progressbar(self.master, orient="horizontal", length=200, mode="determinate")
+        self.progress_bar.pack(pady=20)
+
+        self.pomodoro_count_label = ttk.Label(self.master, text="Pomodoros: 0")
+        self.pomodoro_count_label.pack(pady=10)
+
+        self.total_time_label = ttk.Label(self.master, text="Total Time: 00:00:00")
+        self.total_time_label.pack(pady=10)
+
+        button_frame = ttk.Frame(self.master)
+        button_frame.pack(pady=10)
+
+        self.settings_button = ttk.Button(button_frame, text="Settings", command=self.open_settings)
+        self.settings_button.pack(side=tk.LEFT, padx=5)
+
+        self.history_button = ttk.Button(button_frame, text="History", command=self.open_history)
+        self.history_button.pack(side=tk.LEFT, padx=5)
+
+    def toggle_timer(self):
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_queue.put("STOP")
+            self.start_button.config(text="Resume")
+            self.is_running = False
+        else:
+            self.timer_thread = threading.Thread(target=self.run_timer)
+            self.timer_thread.start()
+            self.start_button.config(text="Pause")
+            self.is_running = True
+
+    def run_timer(self):
+        while self.is_running and self.timer.current_time > 0:
+            try:
+                message = self.timer_queue.get(timeout=1)
+                if message == "STOP":
+                    return
+            except queue.Empty:
+                pass
+            
+            self.timer.current_time -= 1
+            if self.timer.mode == "Pomodoro":
+                self.timer.total_pomodoro_time += 1
+            
+            self.master.after(0, self.update_display)
+            time.sleep(1)
+        
+        if self.is_running:
+            self.master.after(0, self.timer_completed)
+
+    def reset_timer(self):
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_queue.put("STOP")
+        self.is_running = False
+        self.timer.current_time = self.timer.get_mode_time()
+        self.start_button.config(text="Start")
+        self.update_display()
+
+    def change_mode(self, *args):
+        self.timer.mode = self.mode_var.get()
+        self.reset_timer()
+
+    def update_display(self):
+        if not self.master.winfo_exists():
+            return  # Stop updating if the window doesn't exist anymore
+        
+        try:
+            self.timer_label.config(text=self.format_time(self.timer.current_time))
+            self.progress_bar["value"] = (1 - self.timer.current_time / self.timer.get_mode_time()) * 100
+            self.update_total_time_label()
+        except tk.TclError:
+            # Handle the case where the widgets no longer exist
+            pass
+
+    def play_sound(self, sound_file):
+        def sound_thread():
+            try:
+                wave_obj = sa.WaveObject.from_wave_file(sound_file)
+                play_obj = wave_obj.play()
+                play_obj.wait_done()
+            except Exception as e:
+                print(f"Error playing sound: {e}")
+
+        threading.Thread(target=sound_thread, daemon=True).start()
+
+    def timer_completed(self):
+        if self.timer.mode == "Pomodoro":
+            self.timer.pomodoro_count += 1
+            self.timer.mode = "Long Break" if self.timer.pomodoro_count % 4 == 0 else "Short Break"
+            self.update_historical_data()
+        else:
+            self.timer.mode = "Pomodoro"
+        
+        self.play_sound(self.break_sound if self.timer.mode == "Pomodoro" else self.pomodoro_sound)
+        messagebox.showinfo("Pomodoro Timer", "Break time!" if self.timer.mode == "Pomodoro" else "Back to work!")
+        self.mode_var.set(self.timer.mode)
+        self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
+        self.reset_timer()
+
+    def update_historical_data(self):
+        today = datetime.date.today()
+        if self.timer.historical_data and self.timer.historical_data[-1][0] == today:
+            self.timer.historical_data[-1] = (today, self.timer.historical_data[-1][1] + 1)
+        else:
+            self.timer.historical_data.append((today, 1))
+        self.timer.save_historical_data()
+
+    def open_settings(self):
+        settings_window = tk.Toplevel(self.master)
+        settings_window.title("Settings")
+        settings_window.geometry("300x300")
+        settings_window.resizable(False, False)
+
+        ttk.Label(settings_window, text="Pomodoro Duration (minutes):").pack(pady=5)
+        pomodoro_entry = ttk.Entry(settings_window)
+        pomodoro_entry.insert(0, str(self.timer.pomodoro_time // 60))
+        pomodoro_entry.pack(pady=5)
+
+        ttk.Label(settings_window, text="Short Break Duration (minutes):").pack(pady=5)
+        short_break_entry = ttk.Entry(settings_window)
+        short_break_entry.insert(0, str(self.timer.short_break_time // 60))
+        short_break_entry.pack(pady=5)
+
+        ttk.Label(settings_window, text="Long Break Duration (minutes):").pack(pady=5)
+        long_break_entry = ttk.Entry(settings_window)
+        long_break_entry.insert(0, str(self.timer.long_break_time // 60))
+        long_break_entry.pack(pady=5)
+
+        def save_settings():
+            try:
+                self.timer.pomodoro_time = int(pomodoro_entry.get()) * 60
+                self.timer.short_break_time = int(short_break_entry.get()) * 60
+                self.timer.long_break_time = int(long_break_entry.get()) * 60
+                self.timer.save_settings()
+                self.reset_timer()
+                settings_window.destroy()
+            except ValueError:
+                messagebox.showerror("Invalid Input", "Please enter valid numbers for all durations.")
+
+        ttk.Button(settings_window, text="Save", command=save_settings).pack(pady=10)
+
+    def update_total_time_label(self):
+        if not self.master.winfo_exists():
+            return  # Stop updating if the window doesn't exist anymore
+        
+        try:
+            total_seconds = self.timer.total_pomodoro_time
+            self.total_time_label.config(text=f"Total Time: {self.format_time(total_seconds)}")
+        except tk.TclError:
+            # Handle the case where the label no longer exists
+            pass
+
+    def open_history(self):
+        history_window = tk.Toplevel(self.master)
+        history_window.title("Pomodoro History")
+        history_window.geometry("700x400")
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        canvas = FigureCanvasTkAgg(fig, master=history_window)
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.pack(fill=tk.BOTH, expand=True)
+
+        data = list(self.timer.historical_data)
+        dates = [item[0] for item in data]
+        counts = [item[1] for item in data]
+
+        ax.bar(dates, counts)
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Pomodoros Completed")
+        ax.set_title("Pomodoro History (Last 7 Days)")
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+
+        canvas.draw()
+
+    @staticmethod
+    def format_time(seconds):
+        minutes, secs = divmod(seconds, 60)
+        return f"{minutes:02d}:{secs:02d}"
+
+    def on_closing(self):
+        self.is_running = False
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_queue.put("STOP")
+            self.timer_thread.join(timeout=2)  # Wait for the thread to finish
+        self.master.destroy()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = PomodoroTimerGUI(root)
+    root.mainloop()

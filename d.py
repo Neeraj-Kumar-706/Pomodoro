@@ -115,7 +115,7 @@ class PomodoroTimerBase:
     def get_historical_data(self):
         """Get the historical data for plotting"""
         return list(self.historical_data)
-#edit
+    #edit
     
     def load_historical_data(self):
         """Load historical data from a JSON file"""
@@ -151,7 +151,7 @@ class PomodoroTimerGUI:
         self.style = Style(theme='darkly')
         #edit
         pmdt=PomodoroTimerBase.load_settings(self)
-#edit
+        #edit
         self.timer_label = ttk.Label(self.master, text=f"{pmdt[0]//60}:00", font=("Helvetica", 48))
         self.timer_label.pack(pady=20)
 
