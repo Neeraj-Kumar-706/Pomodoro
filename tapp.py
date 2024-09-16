@@ -1,10 +1,9 @@
 # test version for fix issue sat timer ,implement threading , start button and reset button is not working
+# main hight is using thearding to fix performence issues final
 import tkinter as tk
 from ttkbootstrap import Style, ttk
 from tkinter import messagebox
-import os
 import threading
-import queue
 import time
 import simpleaudio as sa
 import matplotlib.pyplot as plt
@@ -12,6 +11,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from collections import deque
 import datetime
 import json
+import os
+#import sys
 
 class PomodoroTimer:
     def __init__(self):
@@ -72,11 +73,11 @@ class PomodoroTimerGUI:
         self.pomodoro_sound = os.path.join(os.path.dirname(__file__), 'work.wav')
         self.break_sound = os.path.join(os.path.dirname(__file__), 'rest.wav')
         
-        self.timer_queue = queue.Queue()
         self.timer_thread = None
-        self.is_running = True
+        self.is_running = False
+        self.is_paused = False
+        self.should_stop = threading.Event()
 
-        # Set up the protocol for window closing
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
     def setup_gui(self):
         self.master.title("Pomodoro Timer")
@@ -115,41 +116,43 @@ class PomodoroTimerGUI:
 
         self.history_button = ttk.Button(button_frame, text="History", command=self.open_history)
         self.history_button.pack(side=tk.LEFT, padx=5)
-
+# replace below method with new
     def toggle_timer(self):
-        if self.timer_thread and self.timer_thread.is_alive():
-            self.timer_queue.put("STOP")
-            self.start_button.config(text="Resume")
-            self.is_running = False
+        if self.is_running:
+            if self.is_paused:
+                self.is_paused = False
+                self.start_button.config(text="Pause")
+            else:
+                self.is_paused = True
+                self.start_button.config(text="Resume")
         else:
+            self.is_running = True
+            self.is_paused = False
+            self.start_button.config(text="Pause")
             self.timer_thread = threading.Thread(target=self.run_timer)
             self.timer_thread.start()
-            self.start_button.config(text="Pause")
-            self.is_running = True
 
     def run_timer(self):
-        while self.is_running and self.timer.current_time > 0:
-            try:
-                message = self.timer_queue.get(timeout=1)
-                if message == "STOP":
-                    return
-            except queue.Empty:
-                pass
-            
-            self.timer.current_time -= 1
-            if self.timer.mode == "Pomodoro":
-                self.timer.total_pomodoro_time += 1
-            
-            self.master.after(0, self.update_display)
-            time.sleep(1)
+        while not self.should_stop.is_set() and self.timer.current_time > 0:
+            if not self.is_paused:
+                self.timer.current_time -= 1
+                if self.timer.mode == "Pomodoro":
+                    self.timer.total_pomodoro_time += 1
+                self.master.after(0, self.update_display)
+                time.sleep(1)
+            else:
+                time.sleep(0.1)
         
-        if self.is_running:
+        if not self.should_stop.is_set():
             self.master.after(0, self.timer_completed)
 
     def reset_timer(self):
-        if self.timer_thread and self.timer_thread.is_alive():
-            self.timer_queue.put("STOP")
         self.is_running = False
+        self.is_paused = False
+        self.should_stop.set()
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_thread.join(timeout=1)
+        self.should_stop.clear()
         self.timer.current_time = self.timer.get_mode_time()
         self.start_button.config(text="Start")
         self.update_display()
@@ -159,17 +162,12 @@ class PomodoroTimerGUI:
         self.reset_timer()
 
     def update_display(self):
-        if not self.master.winfo_exists():
-            return  # Stop updating if the window doesn't exist anymore
-        
-        try:
-            self.timer_label.config(text=self.format_time(self.timer.current_time))
-            self.progress_bar["value"] = (1 - self.timer.current_time / self.timer.get_mode_time()) * 100
-            self.update_total_time_label()
-        except tk.TclError:
-            # Handle the case where the widgets no longer exist
-            pass
+        self.timer_label.config(text=self.format_time(self.timer.current_time))
+        self.progress_bar["value"] = (1 - self.timer.current_time / self.timer.get_mode_time()) * 100
+        self.update_total_time_label()
 
+
+        
     def play_sound(self, sound_file):
         def sound_thread():
             try:
@@ -179,7 +177,9 @@ class PomodoroTimerGUI:
             except Exception as e:
                 print(f"Error playing sound: {e}")
 
-        threading.Thread(target=sound_thread, daemon=True).start()
+        sound_thread = threading.Thread(target=sound_thread, daemon=True)
+        sound_thread.start()
+        return sound_thread  # Return the thread object
 
     def timer_completed(self):
         if self.timer.mode == "Pomodoro":
@@ -189,12 +189,12 @@ class PomodoroTimerGUI:
         else:
             self.timer.mode = "Pomodoro"
         
-        self.play_sound(self.break_sound if self.timer.mode == "Pomodoro" else self.pomodoro_sound)
+        sound_thread = self.play_sound(self.break_sound if self.timer.mode == "Pomodoro" else self.pomodoro_sound)
         messagebox.showinfo("Pomodoro Timer", "Break time!" if self.timer.mode == "Pomodoro" else "Back to work!")
+        sound_thread.join()  # Wait for sound to finish playing
         self.mode_var.set(self.timer.mode)
         self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
         self.reset_timer()
-
     def update_historical_data(self):
         today = datetime.date.today()
         if self.timer.historical_data and self.timer.historical_data[-1][0] == today:
@@ -251,9 +251,14 @@ class PomodoroTimerGUI:
     def open_history(self):
         history_window = tk.Toplevel(self.master)
         history_window.title("Pomodoro History")
-        history_window.geometry("700x400")
+        history_window.geometry("700x450")
 
+        # Set up the plot with a dark theme
+        plt.style.use('dark_background')
         fig, ax = plt.subplots(figsize=(8, 5))
+        fig.patch.set_facecolor('#2b2b2b')  # Dark grey background
+        ax.set_facecolor('#2b2b2b')  # Dark grey background for the plot area
+
         canvas = FigureCanvasTkAgg(fig, master=history_window)
         canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack(fill=tk.BOTH, expand=True)
@@ -262,27 +267,57 @@ class PomodoroTimerGUI:
         dates = [item[0] for item in data]
         counts = [item[1] for item in data]
 
-        ax.bar(dates, counts)
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Pomodoros Completed")
-        ax.set_title("Pomodoro History (Last 7 Days)")
-        plt.xticks(rotation=45, ha='right')
-        plt.tight_layout()
+        bars = ax.bar(dates, counts, color='#1e90ff')  # Dodger blue bars
 
+        # Customize the plot
+        ax.set_xlabel("Date", color='white', fontweight='bold')
+        ax.set_ylabel("Pomodoros Completed", color='white', fontweight='bold')
+        ax.set_title("Pomodoro History (Last 7 Days)", color='white', fontweight='bold', fontsize=14)
+        
+        # Customize x-axis
+        plt.xticks(rotation=45, ha='right', color='white')
+        
+        # Customize y-axis
+        plt.yticks(color='white')
+        
+        # Add value labels on top of each bar
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{int(height)}',
+                    ha='center', va='bottom', color='white')
+
+        # Remove top and right spines
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+        # Color the remaining spines white
+        ax.spines['bottom'].set_color('white')
+        ax.spines['left'].set_color('white')
+
+        plt.tight_layout()
         canvas.draw()
 
     @staticmethod
     def format_time(seconds):
         minutes, secs = divmod(seconds, 60)
         return f"{minutes:02d}:{secs:02d}"
-
+    
     def on_closing(self):
         self.is_running = False
+        self.should_stop.set()
         if self.timer_thread and self.timer_thread.is_alive():
-            self.timer_queue.put("STOP")
-            self.timer_thread.join(timeout=2)  # Wait for the thread to finish
+            self.timer_thread.join(timeout=1)
+        self.master.quit()
         self.master.destroy()
+        os._exit(0)  # Force Python to exit
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = PomodoroTimerGUI(root)
-    root.mainloop()
+    try:
+        root.mainloop()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        os._exit(0)  # Ensure the application exits even if an exception occurs
