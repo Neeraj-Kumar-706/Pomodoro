@@ -5,7 +5,7 @@ This repository contains the code for a Pomodoro Timer application. The applicat
 ## Prerequisites
 
 Before running the application, make sure you have the following installed:
-# here is a issue with veersion of numpy which requires by matplotlib so i highly recommend you install using requirements.txt
+# here is a issue with version of numpy which requires by matplotlib so i highly recommend you install using requirements.txt
 - Python 3.x
 - `tkinter` package
 - `ttkbootstrap` package
