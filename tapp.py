@@ -70,6 +70,7 @@ class PomodoroTimerGUI:
         self.master = master
         self.timer = PomodoroTimer()
         self.setup_gui()
+      
         self.pomodoro_sound = os.path.join(os.path.dirname(__file__), 'work.wav')
         self.break_sound = os.path.join(os.path.dirname(__file__), 'rest.wav')
         
@@ -80,6 +81,7 @@ class PomodoroTimerGUI:
 
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
     def setup_gui(self):
+    
         self.master.title("Pomodoro Timer")
         self.master.geometry("300x550")
         self.master.resizable(False, False)
@@ -190,7 +192,7 @@ class PomodoroTimerGUI:
             self.timer.mode = "Pomodoro"
         
         sound_thread = self.play_sound(self.break_sound if self.timer.mode == "Pomodoro" else self.pomodoro_sound)
-        messagebox.showinfo("Pomodoro Timer", "Break time!" if self.timer.mode == "Pomodoro" else "Back to work!")
+        messagebox.showinfo("Pomodoro Timer", "let get to work!" if self.timer.mode == "Pomodoro" else "well done take a break!")
         sound_thread.join()  # Wait for sound to finish playing
         self.mode_var.set(self.timer.mode)
         self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
@@ -251,7 +253,7 @@ class PomodoroTimerGUI:
     def open_history(self):
         history_window = tk.Toplevel(self.master)
         history_window.title("Pomodoro History")
-        history_window.geometry("700x450")
+        history_window.geometry("750x450")
 
         # Set up the plot with a dark theme
         plt.style.use('dark_background')
@@ -314,6 +316,8 @@ class PomodoroTimerGUI:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    icon_image = tk.PhotoImage(file="logo5.png")  # Ensure logo.png is in the same directory
+    root.iconphoto(False, icon_image)  
     app = PomodoroTimerGUI(root)
     try:
         root.mainloop()
