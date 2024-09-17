@@ -316,7 +316,7 @@ class PomodoroTimerGUI:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    icon_image = tk.PhotoImage(file="logo5.png")  # Ensure logo.png is in the same directory
+    icon_image = tk.PhotoImage(file="logo5.png")  # use some logo i give what you like # Ensure logo.png is in the same directory
     root.iconphoto(False, icon_image)  
     app = PomodoroTimerGUI(root)
     try:
