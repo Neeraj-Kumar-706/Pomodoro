@@ -71,8 +71,8 @@ class PomodoroTimerGUI:
         self.timer = PomodoroTimer()
         self.setup_gui()
       
-        self.pomodoro_sound = os.path.join(os.path.dirname(__file__), 'work.wav')
-        self.break_sound = os.path.join(os.path.dirname(__file__), 'rest.wav')
+        self.pomodoro_sound = os.path.join(os.path.dirname(__file__), 'assets/work.wav')
+        self.break_sound = os.path.join(os.path.dirname(__file__), 'assets/rest.wav')
         
         self.timer_thread = None
         self.is_running = False
@@ -316,7 +316,7 @@ class PomodoroTimerGUI:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    icon_image = tk.PhotoImage(file="logo5.png")  # use some logo i give what you like # Ensure logo.png is in the same directory
+    icon_image = tk.PhotoImage(file="assets/logo5.png")  # use some logo i give what you like # Ensure logo.png is in the same directory
     root.iconphoto(False, icon_image)  
     app = PomodoroTimerGUI(root)
     try:
