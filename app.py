@@ -174,7 +174,7 @@ class PomodoroTimerGUI:
         def sound_thread():
             try:
                 wave_obj = sa.WaveObject.from_wave_file(sound_file)
-                play_obj = wave_obj.play()
+                play_obj = wave_obj.play(volume=1.0)
                 play_obj.wait_done()
             except Exception as e:
                 print(f"Error playing sound: {e}")
