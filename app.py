@@ -174,7 +174,7 @@ class PomodoroTimerGUI:
         def sound_thread():
             try:
                 wave_obj = sa.WaveObject.from_wave_file(sound_file)
-                play_obj = wave_obj.play(volume=1.0)
+                play_obj = wave_obj.play()
                 play_obj.wait_done()
             except Exception as e:
                 print(f"Error playing sound: {e}")
@@ -316,7 +316,7 @@ class PomodoroTimerGUI:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    icon_image = tk.PhotoImage(file="assets/logo5.png")  # use some logo i give what you like # Ensure logo.png is in the same directory
+    icon_image = tk.PhotoImage(file="assets/time-organization.png")  # use some logo i give what you like # Ensure logo.png is in the same directory
     root.iconphoto(False, icon_image)  
     app = PomodoroTimerGUI(root)
     try:
