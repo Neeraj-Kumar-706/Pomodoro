@@ -38,9 +38,8 @@ The code is divided into three files:
 
 - `app.py`: This file contains the main application code and is responsible for running the Pomodoro Timer.
 
-- `d.py`: This file contains the draft code for the new Pomodoro Timer implementation. It is used for testing and debugging purposes.
+- `draft.py`: This file contains the draft code for the new Pomodoro Timer implementation. It is used for testing and debugging purposes.
 
-- `t.py`: This file contains the test code for code debugging and testing.
 
 ## Contributing
 
