@@ -12,6 +12,7 @@ from collections import deque
 import datetime
 import json
 import os
+import chime
 #import sys
 
 class PomodoroTimer:
@@ -78,7 +79,7 @@ class PomodoroTimerGUI:
         self.is_running = False
         self.is_paused = False
         self.should_stop = threading.Event()
-
+        chime.theme("big-sur")
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
     def setup_gui(self):
     
@@ -123,15 +124,19 @@ class PomodoroTimerGUI:
         if self.is_running:
             if self.is_paused:
                 self.is_paused = False
+                chime.info()
                 self.start_button.config(text="Pause")
             else:
                 self.is_paused = True
+                chime.info()
                 self.start_button.config(text="Resume")
         else:
             self.is_running = True
             self.is_paused = False
+            chime.info()
             self.start_button.config(text="Pause")
             self.timer_thread = threading.Thread(target=self.run_timer)
+            
             self.timer_thread.start()
 
     def run_timer(self):
@@ -152,14 +157,18 @@ class PomodoroTimerGUI:
         self.is_running = False
         self.is_paused = False
         self.should_stop.set()
+        chime.success()
         if self.timer_thread and self.timer_thread.is_alive():
             self.timer_thread.join(timeout=1)
         self.should_stop.clear()
         self.timer.current_time = self.timer.get_mode_time()
         self.start_button.config(text="Start")
+        
         self.update_display()
+        
 
     def change_mode(self, *args):
+        chime.warning()
         self.timer.mode = self.mode_var.get()
         self.reset_timer()
 
@@ -231,12 +240,15 @@ class PomodoroTimerGUI:
                 self.timer.pomodoro_time = int(pomodoro_entry.get()) * 60
                 self.timer.short_break_time = int(short_break_entry.get()) * 60
                 self.timer.long_break_time = int(long_break_entry.get()) * 60
+                chime.success()
                 self.timer.save_settings()
                 self.reset_timer()
+                
                 settings_window.destroy()
             except ValueError:
+                chime.error()
                 messagebox.showerror("Invalid Input", "Please enter valid numbers for all durations.")
-
+                
         ttk.Button(settings_window, text="Save", command=save_settings).pack(pady=10)
 
     def update_total_time_label(self):
@@ -253,7 +265,7 @@ class PomodoroTimerGUI:
     def open_history(self):
         history_window = tk.Toplevel(self.master)
         history_window.title("Pomodoro History")
-        history_window.geometry("750x450")
+        history_window.geometry("750x500")
 
         # Set up the plot with a dark theme
         plt.style.use('dark_background')
@@ -268,13 +280,13 @@ class PomodoroTimerGUI:
         data = list(self.timer.historical_data)
         dates = [item[0] for item in data]
         counts = [item[1] for item in data]
-
+        chime.error()
         bars = ax.bar(dates, counts, color='#1e90ff')  # Dodger blue bars
 
         # Customize the plot
         ax.set_xlabel("Date", color='white', fontweight='bold')
         ax.set_ylabel("Pomodoros Completed", color='white', fontweight='bold')
-        ax.set_title("Pomodoro History (Last 7 Days)", color='white', fontweight='bold', fontsize=14)
+        ax.set_title("Pomodoro History", color='white', fontweight='bold', fontsize=14)
         
         # Customize x-axis
         plt.xticks(rotation=45, ha='right', color='white')

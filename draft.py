@@ -12,6 +12,7 @@ from collections import deque
 import datetime
 import json
 import os
+import chime
 #import sys
 
 class PomodoroTimer:
@@ -71,51 +72,46 @@ class PomodoroTimerGUI:
         self.timer = PomodoroTimer()
         self.setup_gui()
       
-        self.pomodoro_sound = os.path.join(os.path.dirname(__file__), 'work.wav')
-        self.break_sound = os.path.join(os.path.dirname(__file__), 'rest.wav')
+        self.pomodoro_sound = os.path.join(os.path.dirname(__file__), 'assets/work.wav')
+        self.break_sound = os.path.join(os.path.dirname(__file__), 'assets/rest.wav')
         
         self.timer_thread = None
         self.is_running = False
         self.is_paused = False
         self.should_stop = threading.Event()
-
+        chime.theme("big-sur")
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
-
     def setup_gui(self):
+    
         self.master.title("Pomodoro Timer")
         self.master.geometry("300x550")
         self.master.resizable(False, False)
 
-        # Apply the darkly theme
         self.style = Style(theme='darkly')
 
-        # Create a main frame to hold all widgets
-        self.main_frame = ttk.Frame(self.master)
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
-
-        self.timer_label = ttk.Label(self.main_frame, text=self.format_time(self.timer.current_time), font=("Helvetica", 48))
+        self.timer_label = ttk.Label(self.master, text=self.format_time(self.timer.current_time), font=("Helvetica", 48))
         self.timer_label.pack(pady=20)
 
-        self.start_button = ttk.Button(self.main_frame, text="Start", command=self.toggle_timer)
+        self.start_button = ttk.Button(self.master, text="Start", command=self.toggle_timer)
         self.start_button.pack(pady=10)
 
-        self.reset_button = ttk.Button(self.main_frame, text="Reset", command=self.reset_timer)
+        self.reset_button = ttk.Button(self.master, text="Reset", command=self.reset_timer)
         self.reset_button.pack(pady=10)
 
         self.mode_var = tk.StringVar(value="Pomodoro")
-        self.mode_menu = ttk.OptionMenu(self.main_frame, self.mode_var, "Pomodoro", "Pomodoro", "Short Break", "Long Break", command=self.change_mode)
+        self.mode_menu = ttk.OptionMenu(self.master, self.mode_var, "Pomodoro", "Pomodoro", "Short Break", "Long Break", command=self.change_mode)
         self.mode_menu.pack(pady=10)
 
-        self.progress_bar = ttk.Progressbar(self.main_frame, orient="horizontal", length=200, mode="determinate")
+        self.progress_bar = ttk.Progressbar(self.master, orient="horizontal", length=200, mode="determinate")
         self.progress_bar.pack(pady=20)
 
-        self.pomodoro_count_label = ttk.Label(self.main_frame, text="Pomodoros: 0")
+        self.pomodoro_count_label = ttk.Label(self.master, text="Pomodoros: 0")
         self.pomodoro_count_label.pack(pady=10)
 
-        self.total_time_label = ttk.Label(self.main_frame, text="Total Time: 00:00:00")
+        self.total_time_label = ttk.Label(self.master, text="Total Time: 00:00:00")
         self.total_time_label.pack(pady=10)
 
-        button_frame = ttk.Frame(self.main_frame)
+        button_frame = ttk.Frame(self.master)
         button_frame.pack(pady=10)
 
         self.settings_button = ttk.Button(button_frame, text="Settings", command=self.open_settings)
@@ -123,21 +119,24 @@ class PomodoroTimerGUI:
 
         self.history_button = ttk.Button(button_frame, text="History", command=self.open_history)
         self.history_button.pack(side=tk.LEFT, padx=5)
-
 # replace below method with new
     def toggle_timer(self):
         if self.is_running:
             if self.is_paused:
                 self.is_paused = False
+                chime.info()
                 self.start_button.config(text="Pause")
             else:
                 self.is_paused = True
+                chime.info()
                 self.start_button.config(text="Resume")
         else:
             self.is_running = True
             self.is_paused = False
+            chime.info()
             self.start_button.config(text="Pause")
             self.timer_thread = threading.Thread(target=self.run_timer)
+            
             self.timer_thread.start()
 
     def run_timer(self):
@@ -158,14 +157,18 @@ class PomodoroTimerGUI:
         self.is_running = False
         self.is_paused = False
         self.should_stop.set()
+        chime.success()
         if self.timer_thread and self.timer_thread.is_alive():
             self.timer_thread.join(timeout=1)
         self.should_stop.clear()
         self.timer.current_time = self.timer.get_mode_time()
         self.start_button.config(text="Start")
+        
         self.update_display()
+        
 
     def change_mode(self, *args):
+        chime.warning()
         self.timer.mode = self.mode_var.get()
         self.reset_timer()
 
@@ -237,12 +240,15 @@ class PomodoroTimerGUI:
                 self.timer.pomodoro_time = int(pomodoro_entry.get()) * 60
                 self.timer.short_break_time = int(short_break_entry.get()) * 60
                 self.timer.long_break_time = int(long_break_entry.get()) * 60
+                chime.success()
                 self.timer.save_settings()
                 self.reset_timer()
+                
                 settings_window.destroy()
             except ValueError:
+                chime.error()
                 messagebox.showerror("Invalid Input", "Please enter valid numbers for all durations.")
-
+                
         ttk.Button(settings_window, text="Save", command=save_settings).pack(pady=10)
 
     def update_total_time_label(self):
@@ -259,7 +265,7 @@ class PomodoroTimerGUI:
     def open_history(self):
         history_window = tk.Toplevel(self.master)
         history_window.title("Pomodoro History")
-        history_window.geometry("750x450")
+        history_window.geometry("750x500")
 
         # Set up the plot with a dark theme
         plt.style.use('dark_background')
@@ -274,13 +280,13 @@ class PomodoroTimerGUI:
         data = list(self.timer.historical_data)
         dates = [item[0] for item in data]
         counts = [item[1] for item in data]
-
+        chime.error()
         bars = ax.bar(dates, counts, color='#1e90ff')  # Dodger blue bars
 
         # Customize the plot
         ax.set_xlabel("Date", color='white', fontweight='bold')
         ax.set_ylabel("Pomodoros Completed", color='white', fontweight='bold')
-        ax.set_title("Pomodoro History (Last 7 Days)", color='white', fontweight='bold', fontsize=14)
+        ax.set_title("Pomodoro History", color='white', fontweight='bold', fontsize=14)
         
         # Customize x-axis
         plt.xticks(rotation=45, ha='right', color='white')
@@ -319,24 +325,15 @@ class PomodoroTimerGUI:
         self.master.quit()
         self.master.destroy()
         os._exit(0)  # Force Python to exit
-def main():
+
+if __name__ == "__main__":
     root = tk.Tk()
+    icon_image = tk.PhotoImage(file="assets/time-organization.png")  # use some logo i give what you like # Ensure logo.png is in the same directory
+    root.iconphoto(False, icon_image)  
     app = PomodoroTimerGUI(root)
-    
-    # Load and set the icon
-    try:
-        icon_path = os.path.join(os.path.dirname(__file__), "logo5.png")
-        icon_image = tk.PhotoImage(file=icon_path)
-        root.iconphoto(False, icon_image)
-    except Exception as e:
-        print(f"Error setting icon: {e}")
-    
     try:
         root.mainloop()
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
         os._exit(0)  # Ensure the application exits even if an exception occurs
-
-if __name__ == "__main__":
-    main()
