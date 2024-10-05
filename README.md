@@ -11,6 +11,7 @@ Before running the application, make sure you have the following installed:
 - `ttkbootstrap` package
 - `simpleaudio` package
 - `matplotlib` package
+- `chime` package
 
 ## Installation
 
