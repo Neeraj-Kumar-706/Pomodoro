@@ -242,8 +242,7 @@ class PomodoroTimerGUI:
                 self.timer.long_break_time = int(long_break_entry.get()) * 60
                 chime.success()
                 self.timer.save_settings()
-                self.reset_timer()
-                
+                #self.reset_timer() # this will reset the timer to the new settings custimiz as your liking
                 settings_window.destroy()
             except ValueError:
                 chime.error()
