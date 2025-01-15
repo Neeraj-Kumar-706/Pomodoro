@@ -125,4 +125,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 # custom 
-#/assets/rain_sound.mp3 #give lfs error
+assets/rain_sound.mp3 
+#give lfs error
