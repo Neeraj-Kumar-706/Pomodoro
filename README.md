@@ -85,7 +85,7 @@ The code is divided into three files:
 - `app.py`: This file contains the main application code and is responsible for running the Pomodoro Timer.
 
 - `draft.py`: This file contains the draft code for the new Pomodoro Timer implementation. It is used for testing and debugging purposes.
-
+- `rain_sound.mp3`: This file contains the background music so add it to assets folder please and also logo of your desire path /assets/logo.png
 
 ## Contributing
 
