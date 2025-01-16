@@ -1,4 +1,4 @@
-# final edit 15/01/25 replace simple audio with pygame and add rain sound feature 
+# final edit 16/01/25 replace simple audio with pygame and add rain sound feature 
 import tkinter as tk
 from ttkbootstrap import Style, ttk
 from tkinter import messagebox
@@ -269,8 +269,8 @@ class PomodoroTimerGUI:
             self.update_historical_data()
         else:
             self.timer.mode = "Pomodoro"
-
-        # sound_thread = self.play_sound(self.break_sound if self.timer.mode == "Pomodoro" else self.pomodoro_sound)
+        #edit 16/01/25 add below to stop rain sound then nofity and on click ok it again start rain sound
+        self.stop_rain_sound()
         chime.success()
         messagebox.showinfo(
             "Pomodoro Timer",
@@ -280,7 +280,7 @@ class PomodoroTimerGUI:
                 else "well done take a break!"
             ),
         )
-        # sound_thread.join()  # Wait for sound to finish playing
+        self.play_rain_sound() #edit 16/01/25
         self.mode_var.set(self.timer.mode)
         self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
         self.reset_timer()
