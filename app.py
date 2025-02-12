@@ -341,9 +341,9 @@ class PomodoroTimerGUI:
 
         try:
             total_seconds = self.timer.total_pomodoro_time
-            self.total_time_label.config(
-                text=f"Total Time: {self.format_time(total_seconds)}"
-            )
+            formatted_time = time.strftime('%H:%M:%S', time.gmtime(total_seconds))
+            self.total_time_label.config(text=f"Total Time:{formatted_time}")
+            
         except tk.TclError:
             # Handle the case where the label no longer exists
             pass

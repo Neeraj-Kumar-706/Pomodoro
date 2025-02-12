@@ -5,10 +5,10 @@ cd /home/neeraj/apps/Pomodoro
 #
 #cd /mnt/88c49251-2b3d-489c-be49-24b3d296dd4b/project_decdo/Pomodoro
 # set path for your environment
-source .venv/bin/activate
+source env/bin/activate
 # Run the Pomodoro app
 #python app.py & disown use pervious version
-python draft.py > /dev/null 2>&1 & disown # edit 15/01/25 use app.py for better version
+python app.py > /dev/null 2>&1 & disown # edit 15/01/25 use app.py for better version
 # deactivate environment
 deactivate
 # Close the terminal
