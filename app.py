@@ -339,7 +339,7 @@ class PomodoroTimerGUI:
         if not self.master.winfo_exists():
             return  # Stop updating if the window doesn't exist anymore
 
-        try:
+        try:# at scene formating for label 12-02-2025
             total_seconds = self.timer.total_pomodoro_time
             formatted_time = time.strftime('%H:%M:%S', time.gmtime(total_seconds))
             self.total_time_label.config(text=f"Total Time:{formatted_time}")
