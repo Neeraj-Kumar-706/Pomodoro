@@ -86,6 +86,7 @@ class PomodoroTimerGUI:
         self.is_paused = False
         self.should_stop = threading.Event()
         self.is_playing = False
+        self.is_user_playsound=False
         self.play_obj = None
         self.play_thread = None
         self.stop_playback = threading.Event()
@@ -170,9 +171,13 @@ class PomodoroTimerGUI:
 
     def toggle_rain_sound(self):
         if self.is_playing:
+            self.is_user_playsound=False
             self.stop_rain_sound()
+            
         else:
+            self.is_user_playsound=True
             self.play_rain_sound()
+            
 
     def play_rain_sound(self):
         def play():
@@ -270,7 +275,8 @@ class PomodoroTimerGUI:
         else:
             self.timer.mode = "Pomodoro"
         #edit 16/01/25 add below to stop rain sound then nofity and on click ok it again start rain sound
-        self.stop_rain_sound()
+        if self.is_user_playsound: # edit 19/02/25 fix bug : it start audio after complete one podomoro when user even not start bg music
+            self.stop_rain_sound()
         chime.success()
         messagebox.showinfo(
             "Pomodoro Timer",

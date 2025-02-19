@@ -125,5 +125,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 # custom 
-assets/rain_sound.mp3 
+assets/rain_sound.mp3
+settings.json
+pomodoro_history.json
 #give lfs error
