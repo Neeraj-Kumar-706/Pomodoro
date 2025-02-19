@@ -1,4 +1,4 @@
-# final edit 16/01/25 replace simple audio with pygame and add rain sound feature 
+# final edit 16/01/25 replace simple audio with pygame and add rain sound feature
 import tkinter as tk
 from ttkbootstrap import Style, ttk
 from tkinter import messagebox
@@ -76,7 +76,6 @@ class PomodoroTimerGUI:
         self.timer = PomodoroTimer()
         self.setup_gui()
 
-
         self.rain_sound = os.path.join(
             os.path.dirname(__file__), "assets/rain_sound.mp3"
         )
@@ -86,7 +85,7 @@ class PomodoroTimerGUI:
         self.is_paused = False
         self.should_stop = threading.Event()
         self.is_playing = False
-        self.is_user_playsound=False
+        self.is_user_playsound = False
         self.play_obj = None
         self.play_thread = None
         self.stop_playback = threading.Event()
@@ -171,13 +170,11 @@ class PomodoroTimerGUI:
 
     def toggle_rain_sound(self):
         if self.is_playing:
-            self.is_user_playsound=False
+            self.is_user_playsound = False  # edit 19/02/25
             self.stop_rain_sound()
-            
         else:
-            self.is_user_playsound=True
+            self.is_user_playsound = True  # edit 19/02/25
             self.play_rain_sound()
-            
 
     def play_rain_sound(self):
         def play():
@@ -274,8 +271,8 @@ class PomodoroTimerGUI:
             self.update_historical_data()
         else:
             self.timer.mode = "Pomodoro"
-        #edit 16/01/25 add below to stop rain sound then nofity and on click ok it again start rain sound
-        if self.is_user_playsound: # edit 19/02/25 fix bug : it start audio after complete one podomoro when user even not start bg music
+            # edit 16/01/25 add below to stop rain sound then nofity and on click ok it again start rain sound
+            # edit 19/02/25 fix bug : it start audio after complete one podomoro when user even not start bg music
             self.stop_rain_sound()
         chime.success()
         messagebox.showinfo(
@@ -286,7 +283,8 @@ class PomodoroTimerGUI:
                 else "well done take a break!"
             ),
         )
-        self.play_rain_sound() #edit 16/01/25
+        if self.is_user_playsound:
+            self.play_rain_sound()  # edit 16/01/25
         self.mode_var.set(self.timer.mode)
         self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
         self.reset_timer()
@@ -345,11 +343,11 @@ class PomodoroTimerGUI:
         if not self.master.winfo_exists():
             return  # Stop updating if the window doesn't exist anymore
 
-        try:# at scene formating for label 12-02-2025
+        try:  # at scene formating for label 12-02-2025
             total_seconds = self.timer.total_pomodoro_time
-            formatted_time = time.strftime('%H:%M:%S', time.gmtime(total_seconds))
+            formatted_time = time.strftime("%H:%M:%S", time.gmtime(total_seconds))
             self.total_time_label.config(text=f"Total Time:{formatted_time}")
-            
+
         except tk.TclError:
             # Handle the case where the label no longer exists
             pass
