@@ -1,4 +1,4 @@
-# Pomodoro Timer
+# Pomodoro Timer (v3)
 
 This repository contains the code for a Pomodoro Timer application. The application allows users to set a timer for a Pomodoro session and provides options to switch between different modes (Pomodoro, Short Break, and Long Break).
 
@@ -27,7 +27,7 @@ Before running the application, make sure you have the following installed:
 ```
 python app.py > /dev/null 2>&1 & disown
 ```
-
+you can replace app.py with app-v3.py for latest version
 
 ## Installation
 
@@ -50,7 +50,7 @@ python app.py > /dev/null 2>&1 & disown
 
 4. Run the application:
     ```sh
-    python app.py > /dev/null 2>&1 & disown
+    python app-v3.py > /dev/null 2>&1 & disown
     ```
 
 ## Usage
@@ -77,6 +77,34 @@ python app.py > /dev/null 2>&1 & disown
 
 7. Access the settings by clicking the "Settings" button.save in file as settings.json
 8. Toggle the rain sound by clicking the "Play Sound" button.
+
+## New Features (March 2024)
+
+### Daily Mega Goal System
+- Set daily work targets in hours
+- Visual progress tracking with dual progress bars
+- Automatic goal completion notifications
+- Per-day goal persistence
+- Date-specific goal tracking (goals are preserved for historical data)
+
+### Enhanced History Visualization
+- Dual chart view showing daily pomodoros and work hours
+- Historical goal tracking (red dotted line)
+- Up to 365 days of history stored (not just 30 days)
+- Last 30 days displayed in graphs for better readability
+- Daily statistics and running averages
+
+### Auto-Switch Mode
+- Automatic transition between work and break sessions
+- Toggleable in settings
+- Persistent setting between sessions
+- Optional notification messages
+
+### Background Rain Sound
+- Ambient rain sound for focus
+- Smart resume after breaks
+- One-click toggle
+- Automatically pauses during breaks
 
 ## Code Structure
 
