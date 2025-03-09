@@ -8,7 +8,7 @@ cd /home/neeraj/apps/Pomodoro
 source env/bin/activate
 # Run the Pomodoro app
 #python app.py & disown use pervious version
-python app.py > /dev/null 2>&1 & disown # edit 15/01/25 use app.py for better version
+python app-v3.py > /dev/null 2>&1 & disown # edit 15/01/25 use app.py for better version
 # deactivate environment
 deactivate
 # Close the terminal
