@@ -64,7 +64,7 @@ you can replace app.py with app-v3.py for latest version
 
 ## Usage
 
-1. Run the application: python3 app.py or if add sh file into bin directory you can run from terminal as ./promodomo or just pomodoro
+1. Run the application: python3 app.py(app-version.py) or if add sh file into bin directory you can run from terminal as ./promodomo or just pomodoro
 2. The application will open in a new window with the Pomodoro Timer GUI.
 
 3. You can start a timer by clicking the "Start" button.
