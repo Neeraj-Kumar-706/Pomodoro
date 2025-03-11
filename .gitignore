@@ -128,4 +128,5 @@ dmypy.json
 assets/rain_sound.mp3
 settings.json
 pomodoro_history.json
+session_state.json
 #give lfs error
