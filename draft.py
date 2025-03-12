@@ -26,12 +26,12 @@ def safe_operation(operation, error_message="Operation failed", default_return=N
 
 class PomodoroTimer:
     def __init__(self):
+        self.auto_switch = True  # Change default to True since settings will override it
         self.load_settings()
         self.today = datetime.date.today()
-        self.sessions_completed = 0  # Add this line
-        self.load_state()  # Load today's state first
+        self.sessions_completed = 0
+        self.load_state()  # This will now properly override auto_switch from session state
         self.historical_data = self.load_historical_data()
-        self.auto_switch = False
         self._cached_daily_time = 0  # Add caching
         self._last_save_time = 0
         self.save_interval = 5  # Save state every 5 seconds
@@ -48,7 +48,7 @@ class PomodoroTimer:
                     self._daily_time = state.get("daily_time", 0)
                     self.mode = state.get("mode", "Pomodoro")
                     self.sessions_completed = state.get("sessions_completed", 0)  # Add this line
-                    self.auto_switch = state.get("auto_switch", self.auto_switch)  # Add this line
+                    self.auto_switch = bool(state.get("auto_switch", self.auto_switch))  # Ensure boolean conversion
                 else:
                     self._init_new_day()
         except FileNotFoundError:
@@ -190,7 +190,7 @@ class PomodoroTimerGUI:
     def __init__(self, master):
         self.master = master
         self.timer = PomodoroTimer()
-        self.auto_switch_var = tk.BooleanVar()  # Remove initial value
+        self.auto_switch_var = tk.BooleanVar(value=self.timer.auto_switch)  # Set initial value here
         self.setup_gui()
 
         self.rain_sound = os.path.join(
