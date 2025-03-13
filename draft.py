@@ -103,6 +103,7 @@ class PomodoroTimer:
                 self.mega_goal = settings.get("mega_goal", 4) * 3600  # Default 4 hours
                 self.auto_switch = settings.get("auto_switch", False)
                 self.sound_enabled = settings.get("sound_enabled", True)  # Add sound enabled setting
+                self.rain_sound_path = settings.get("rain_sound_path", "")  # Add this line
         except FileNotFoundError:
             self.pomodoro_time = 25 * 60
             self.short_break_time = 5 * 60
@@ -110,6 +111,7 @@ class PomodoroTimer:
             self.mega_goal = 4 * 3600  # 4 hours in seconds
             self.auto_switch = False
             self.sound_enabled = True
+            self.rain_sound_path = ""  # Add this line
 
     def get_mode_time(self):
         return {
@@ -170,6 +172,7 @@ class PomodoroTimer:
             "mega_goal": self.mega_goal // 3600,
             "auto_switch": self.auto_switch,
             "sound_enabled": self.sound_enabled,
+            "rain_sound_path": self.rain_sound_path  # Add this line
         }
         with open("settings.json", "w") as f:
             json.dump(settings, f)
@@ -196,11 +199,11 @@ class PomodoroTimerGUI:
 
     def setup_audio(self):
         """Initialize audio-related attributes"""
-        self.rain_sound = os.path.join(os.path.dirname(__file__), "assets/rain_sound.mp3")
+        self.rain_sound = self.timer.rain_sound_path  # Use path from settings
         self.is_playing = False
         self.is_user_playsound = False
         self.pygame_initialized = False
-        self.pygame = None  # Add pygame attribute
+        self.pygame = None
         chime.theme("big-sur")
 
     def _load_pygame(self):
@@ -398,6 +401,10 @@ class PomodoroTimerGUI:
 
     def play_rain_sound(self):
         try:
+            if not self.rain_sound:
+                messagebox.showwarning("Sound Disabled", "Rain sound feature is disabled. No sound file was provided during installation.")
+                return
+
             if not os.path.exists(self.rain_sound):
                 messagebox.showerror("File Error", "Rain sound file not found")
                 return
@@ -674,10 +681,10 @@ class PomodoroTimerGUI:
             messagebox.showerror("Error", "Failed to update history")
 
     def open_settings(self):
-        chime.info()  # Audio feedback for opening settings
+        chime.info()
         settings_window = tk.Toplevel(self.master)
         settings_window.title("Settings")
-        settings_window.geometry("300x500")
+        settings_window.geometry("400x600")
 
         settings_frame = ttk.Frame(settings_window, padding="20")
         settings_frame.pack(fill="both", expand=True)
@@ -709,6 +716,12 @@ class PomodoroTimerGUI:
             variable=auto_switch_var,
             text="Enable automatic mode switching"
         ).pack(pady=5)
+
+        # Add rain sound path setting - remove browse button, just keep entry
+        ttk.Label(settings_frame, text="Rain Sound File Path:").pack(pady=5)
+        rain_sound_path_entry = ttk.Entry(settings_frame, width=50)
+        rain_sound_path_entry.insert(0, self.timer.rain_sound_path)
+        rain_sound_path_entry.pack(pady=5)
 
         button_frame = ttk.Frame(settings_frame)
         button_frame.pack(pady=20, fill="x")
@@ -764,11 +777,21 @@ class PomodoroTimerGUI:
                 # Update our GUI's variable to match
                 self.auto_switch_var.set(self.timer.auto_switch)
                 
+                # Update rain sound path and test it
+                new_path = rain_sound_path_entry.get().strip()
+                if new_path and not os.path.exists(new_path):
+                    messagebox.showwarning("Warning", "Rain sound file not found. Path will be saved but sound won't work.")
+                
+                # Save the path even if file doesn't exist - user might fix it later
+                self.timer.rain_sound_path = new_path
+                self.rain_sound = new_path  # Update current instance path
+                
                 self.timer.save_settings()
                 self.reset_timer()
                 
                 if close_window:
                     settings_window.destroy()
+                    
             except ValueError:
                 chime.error()
                 messagebox.showerror(

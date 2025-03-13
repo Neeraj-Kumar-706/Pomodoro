@@ -69,7 +69,7 @@ try {
 
     # Copy files first
     Write-Host "Copying application files..."
-    Copy-Item "$SOURCE_DIR\draft.py" -Destination "$INSTALL_DIR\draft.py" -Force
+    Copy-Item "$SOURCE_DIR\draft.py" -Destination "$INSTALL_DIR\app-v3.py" -Force
     Copy-Item "$SOURCE_DIR\assets" -Destination $INSTALL_DIR -Recurse -Force
 
     # Create and activate virtual environment
@@ -85,11 +85,46 @@ try {
     }
     Pop-Location
 
+    # Ask for rain sound file
+    $rainSoundPath = Read-Host "Enter path to rain sound MP3 file (or press Enter to skip)"
+    
+    if ($rainSoundPath) {
+        if (Test-Path $rainSoundPath) {
+            # Test if file is playable
+            try {
+                $testResult = python -c "import pygame; pygame.mixer.init(); pygame.mixer.music.load('$rainSoundPath')"
+                Set-Content -Path "$INSTALL_DIR\rain_sound_path.txt" -Value $rainSoundPath
+                Write-Host "Rain sound configured successfully"
+            }
+            catch {
+                Write-Host "Warning: Sound file test failed, rain sound feature will be disabled"
+            }
+        }
+        else {
+            Write-Host "Warning: Invalid sound file, rain sound feature will be disabled"
+        }
+    }
+    else {
+        Write-Host "Rain sound feature will be disabled"
+    }
+
+    # Create initial settings.json
+    $settings = @{
+        pomodoro = 25
+        short_break = 5
+        long_break = 15
+        mega_goal = 4
+        auto_switch = $true
+        sound_enabled = $true
+        rain_sound_path = ""
+    }
+    $settings | ConvertTo-Json | Set-Content "$INSTALL_DIR\settings.json"
+
     # Create run script
     $runScript = @"
 @echo off
 call "$INSTALL_DIR\venv\Scripts\activate.bat"
-python "$INSTALL_DIR\draft.py"
+python "$INSTALL_DIR\app-v3.py"
 "@
     Set-Content -Path "$INSTALL_DIR\run.ps1" -Value $runScript
 
@@ -97,7 +132,7 @@ python "$INSTALL_DIR\draft.py"
     $WshShell = New-Object -comObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut("$Home\Desktop\PomodoroTimer.lnk")
     $Shortcut.TargetPath = "$INSTALL_DIR\venv\Scripts\pythonw.exe"
-    $Shortcut.Arguments = """$INSTALL_DIR\draft.py"""
+    $Shortcut.Arguments = """$INSTALL_DIR\app-v3.py"""
     $Shortcut.WorkingDirectory = $INSTALL_DIR
     $Shortcut.IconLocation = "$INSTALL_DIR\assets\time-organization.ico"
     $Shortcut.Save()

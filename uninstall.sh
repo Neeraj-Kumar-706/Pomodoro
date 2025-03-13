@@ -11,12 +11,15 @@ else
     DESKTOP_ENTRY="$HOME/.local/share/applications/pomodoro-timer.desktop"
 fi
 
-# Backup with timestamp and error handling
-if [ -d "$INSTALL_DIR" ]; then
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_DIR="${INSTALL_DIR}_backup_${TIMESTAMP}"
-    echo "Creating backup at: $BACKUP_DIR"
-    cp -r "$INSTALL_DIR" "$BACKUP_DIR" || { echo "Backup failed"; exit 1; }
+# Backup only settings
+if [ -f "$INSTALL_DIR/settings.json" ]; then
+    BACKUP_DIR="$HOME/.config/pomodoro_backups"
+    mkdir -p "$BACKUP_DIR"
+    cp "$INSTALL_DIR/settings.json" "$BACKUP_DIR/settings_$(date +%Y%m%d_%H%M%S).json" || {
+        echo "Failed to backup settings"
+        exit 1
+    }
+    echo "Settings backed up to: $BACKUP_DIR"
 fi
 
 # Deactivate venv if active
@@ -24,13 +27,22 @@ if [ -n "$VIRTUAL_ENV" ]; then
     deactivate
 fi
 
+# Kill all instances properly
+pkill -f "python.*app-v3.py" || true
+sleep 1  # Give processes time to exit
+
+# Remove installation
+rm -rf "$INSTALL_DIR"
+
 # Remove files with proper checks
-for dir in "$INSTALL_DIR/venv" "$INSTALL_DIR" "$APP_DIR" "$APP_DESKTOP"; do
+for dir in "$APP_DIR" "$APP_DESKTOP"; do
     [ -d "$dir" ] && rm -rf "$dir" && echo "Removed: $dir"
 done
 
-# Remove desktop entries
-[ -f "$DESKTOP_ENTRY" ] && rm -f "$DESKTOP_ENTRY" && echo "Removed desktop entry"
+# Cleanup desktop integration
+if [ "$OS" != "Darwin" ]; then
+    rm -f "$DESKTOP_ENTRY"
+    update-desktop-database "$HOME/.local/share/applications" || true
+fi
 
 echo "Uninstallation complete!"
-[ -d "$BACKUP_DIR" ] && echo "Backup available at: $BACKUP_DIR"

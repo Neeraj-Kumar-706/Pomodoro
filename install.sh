@@ -112,19 +112,30 @@ EOF
         # Create XDG directories if they don't exist
         mkdir -p "$HOME/.local/share/applications"
         
-        # Create Linux desktop entry
+        # Create Linux desktop entry with direct execution
         cat > "$HOME/.local/share/applications/pomodoro-timer.desktop" << EOF
 [Desktop Entry]
-Version=1.0
+Type=Application
 Name=Pomodoro Timer
-Comment=Pomodoro Timer Application
-Exec=bash -c 'cd "$INSTALL_DIR" && source venv/bin/activate && python app-v3.py'
+GenericName=Pomodoro Timer
+Comment=Productivity Timer Application
+Exec=sh -c "cd $INSTALL_DIR && . venv/bin/activate && python app-v3.py"
 Icon=$INSTALL_DIR/assets/time-organization.png
 Terminal=false
-Type=Application
-Categories=Utility;
+Categories=Utility;Office;
+Keywords=timer;pomodoro;productivity;
+StartupNotify=true
 EOF
+
         chmod +x "$HOME/.local/share/applications/pomodoro-timer.desktop"
+        
+        # Force desktop database update
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database "$HOME/.local/share/applications"
+        fi
+        if command -v xdg-desktop-menu >/dev/null 2>&1; then
+            xdg-desktop-menu forceupdate
+        fi
     fi
 
     # Verify source files exist
@@ -157,14 +168,27 @@ EOF
     # Copy files with error checking
     echo "Copying application files..."
     if [ "$OS" = "Darwin" ]; then
-        cp "$SOURCE_DIR/draft.py" "$RESOURCES_DIR/draft.py" || exit 1
+        cp "$SOURCE_DIR/draft.py" "$RESOURCES_DIR/app-v3.py" || exit 1
         cp -r "$SOURCE_DIR/assets" "$RESOURCES_DIR/" || exit 1
         chmod -R 755 "$APP_DIR" || exit 1
     else
-        cp "$SOURCE_DIR/draft.py" "$INSTALL_DIR/draft.py" || exit 1
+        cp "$SOURCE_DIR/draft.py" "$INSTALL_DIR/app-v3.py" || exit 1
         cp -r "$SOURCE_DIR/assets" "$INSTALL_DIR/" || exit 1
         chmod -R 755 "$INSTALL_DIR" || exit 1
     fi
+
+    # Create initial settings.json
+    cat > "$INSTALL_DIR/settings.json" << EOF
+{
+    "pomodoro": 25,
+    "short_break": 5,
+    "long_break": 15,
+    "mega_goal": 4,
+    "auto_switch": true,
+    "sound_enabled": true,
+    "rain_sound_path": ""
+}
+EOF
 
     # Create run script
     if [ "$OS" = "Darwin" ]; then
@@ -175,11 +199,12 @@ source "../Resources/venv/bin/activate"
 $PYTHON_CMD "../Resources/draft.py"
 EOF
     else
+        # Create run script for Linux with proper shebang and env activation
         cat > "$INSTALL_DIR/run.sh" << EOF
 #!/bin/bash
 cd "\$(dirname "\$0")"
 source "./venv/bin/activate"
-python draft.py
+exec python app-v3.py
 EOF
         chmod +x "$INSTALL_DIR/run.sh"
         
