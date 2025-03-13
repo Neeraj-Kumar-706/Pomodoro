@@ -1,17 +1,35 @@
 #!/bin/bash
-# Run the Pomodoro app using this script from your terminal or command prompt if add it ob to your PATH
-# you can change this dir to wherever you want
-cd /home/neeraj/apps/Pomodoro
-#
-#cd /mnt/88c49251-2b3d-489c-be49-24b3d296dd4b/project_decdo/Pomodoro
-# set path for your environment
-source env/bin/activate
-# Run the Pomodoro app
-#python app.py & disown use pervious version
-python app-v3.py > /dev/null 2>&1 & disown # edit 15/01/25 use app.py for better version
-# deactivate environment
+
+# Get the absolute path to the installation directory
+if [ "$(uname -s)" = "Darwin" ]; then
+    APP_DIR="$HOME/Applications/PomodoroTimer"
+else
+    APP_DIR="$HOME/.local/share/PomodoroTimer"
+fi
+
+# Check if installation exists
+if [ ! -d "$APP_DIR" ]; then
+    echo "Pomodoro Timer is not installed. Please run the installer first."
+    exit 1
+fi
+
+# Check virtual environment
+if [ ! -d "$APP_DIR/venv" ]; then
+    echo "Virtual environment not found. Please reinstall the application."
+    exit 1
+fi
+
+# Change to app directory
+cd "$APP_DIR" || exit 1
+
+# Activate virtual environment and run app
+source "venv/bin/activate"
+
+# Run the app in background and disown
+python app-v3.py > /dev/null 2>&1 & disown
+
+# Deactivate venv and exit terminal
 deactivate
-# Close the terminal
-exit 
+exit 0
 
 

@@ -457,35 +457,36 @@ class PomodoroTimerGUI:
         self.timer.save_state()
 
     def run_timer(self):
-        """Optimized timer loop"""
-        last_update = time.time()
-        accumulated_time = 0
+        """Fixed timer with consistent speed regardless of pause state"""
+        target_interval = 1.0  # Target 1 second intervals
+        last_tick = time.time()
         
         while not self.should_stop.is_set() and self.timer.current_time > 0:
+            current_time = time.time()
+            
             if self.is_paused:
+                last_tick = current_time  # Reset reference time when paused
                 time.sleep(0.1)
                 continue
-
-            current = time.time()
-            accumulated_time += current - last_update
-            last_update = current
-
-            if accumulated_time >= 1.0:
-                seconds = int(accumulated_time)
-                self.timer.current_time = max(0, self.timer.current_time - seconds)
+            
+            elapsed = current_time - last_tick
+            if elapsed >= target_interval:
+                self.timer.current_time = max(0, self.timer.current_time - 1)
                 
                 if self.timer.mode == "Pomodoro":
-                    self.timer.total_pomodoro_time += seconds
-                
-                accumulated_time -= seconds
+                    self.timer.total_pomodoro_time += 1
+                    # Update total time label immediately
+                    self.master.after(0, self.update_total_time_label)
                 
                 if self.timer.current_time <= 0:
                     self.master.after(0, self.timer_completed)
                     break
                 
                 self.master.after(0, self.update_display)
-
-            time.sleep(0.05)
+                last_tick = current_time
+            
+            sleep_time = max(0.01, min(0.1, target_interval - (time.time() - current_time)))
+            time.sleep(sleep_time)
 
     def timer_completed(self):
         """Streamlined timer completion handler"""
