@@ -18,10 +18,11 @@ if (Test-Path "$INSTALL_DIR\rain_sound_path.txt") {
     }
 }
 
+# Run app
 try {
     Push-Location $INSTALL_DIR
     & "$VENV_PATH\Scripts\Activate.ps1"
-    Start-Process -NoNewWindow -FilePath "$VENV_PATH\Scripts\pythonw.exe" -ArgumentList $APP_PATH
+    Start-Process -NoNewWindow -FilePath "$VENV_PATH\Scripts\pythonw.exe" -ArgumentList "$INSTALL_DIR\app-v3.py"
 }
 catch {
     Write-Host "Error launching app: $_"

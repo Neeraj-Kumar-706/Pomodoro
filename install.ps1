@@ -64,13 +64,13 @@ try {
     # Store source directory
     $SOURCE_DIR = $PWD.Path
 
-    # Create and prepare installation directory
-    New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
-
     # Copy files first
     Write-Host "Copying application files..."
     Copy-Item "$SOURCE_DIR\draft.py" -Destination "$INSTALL_DIR\app-v3.py" -Force
     Copy-Item "$SOURCE_DIR\assets" -Destination $INSTALL_DIR -Recurse -Force
+
+    # Create and prepare installation directory
+    New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
 
     # Create and activate virtual environment
     Write-Host "Creating virtual environment..."
@@ -85,30 +85,7 @@ try {
     }
     Pop-Location
 
-    # Ask for rain sound file
-    $rainSoundPath = Read-Host "Enter path to rain sound MP3 file (or press Enter to skip)"
-    
-    if ($rainSoundPath) {
-        if (Test-Path $rainSoundPath) {
-            # Test if file is playable
-            try {
-                $testResult = python -c "import pygame; pygame.mixer.init(); pygame.mixer.music.load('$rainSoundPath')"
-                Set-Content -Path "$INSTALL_DIR\rain_sound_path.txt" -Value $rainSoundPath
-                Write-Host "Rain sound configured successfully"
-            }
-            catch {
-                Write-Host "Warning: Sound file test failed, rain sound feature will be disabled"
-            }
-        }
-        else {
-            Write-Host "Warning: Invalid sound file, rain sound feature will be disabled"
-        }
-    }
-    else {
-        Write-Host "Rain sound feature will be disabled"
-    }
-
-    # Create initial settings.json
+    # Create initial settings.json with empty rain sound path
     $settings = @{
         pomodoro = 25
         short_break = 5

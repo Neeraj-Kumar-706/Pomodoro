@@ -33,7 +33,7 @@ fi
 # Run app
 cd "$INSTALL_DIR" || exit 1
 source "venv/bin/activate" || exit 1
-python "$APP_SCRIPT" > /dev/null 2>&1 & disown
+python app-v3.py > /dev/null 2>&1 & disown
 
 exit 0
 
