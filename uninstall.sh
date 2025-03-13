@@ -1,45 +1,36 @@
 #!/bin/bash
-set -e  # Exit on error
+set -e
 
-# Enhanced uninstallation with backup
-main() {
-    OS="$(uname -s)"
-    if [ "$OS" = "Darwin" ]; then
-        INSTALL_DIR="$HOME/Applications/PomodoroTimer"
-        APP_DIR="$HOME/Desktop/PomodoroTimer.app"
-    else
-        INSTALL_DIR="$HOME/.local/share/PomodoroTimer"
-        DESKTOP_ENTRY="$HOME/Desktop/PomodoroTimer.desktop"
-    fi
+# Get correct paths based on platform
+if [ "$(uname -s)" = "Darwin" ]; then
+    INSTALL_DIR="$HOME/Library/Application Support/PomodoroTimer"
+    APP_DIR="/Applications/PomodoroTimer.app"  # Fixed Mac app location
+    APP_DESKTOP="$HOME/Desktop/PomodoroTimer.app"
+else
+    INSTALL_DIR="$HOME/.local/share/PomodoroTimer"
+    DESKTOP_ENTRY="$HOME/.local/share/applications/pomodoro-timer.desktop"
+fi
 
-    # Create backup before removing
-    if [ -d "$INSTALL_DIR" ]; then
-        backup_dir="${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
-        echo "Creating backup at: $backup_dir"
-        cp -r "$INSTALL_DIR" "$backup_dir"
-        
-        echo "Removing installation directory..."
-        rm -rf "$INSTALL_DIR"
-        echo "Removed app files from: $INSTALL_DIR"
-    fi
+# Backup with timestamp and error handling
+if [ -d "$INSTALL_DIR" ]; then
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    BACKUP_DIR="${INSTALL_DIR}_backup_${TIMESTAMP}"
+    echo "Creating backup at: $BACKUP_DIR"
+    cp -r "$INSTALL_DIR" "$BACKUP_DIR" || { echo "Backup failed"; exit 1; }
+fi
 
-    # Remove OS-specific files
-    if [ "$OS" = "Darwin" ]; then
-        if [ -d "$APP_DIR" ]; then
-            rm -rf "$APP_DIR"
-            echo "Removed Mac app bundle"
-        fi
-    else
-        if [ -f "$DESKTOP_ENTRY" ]; then
-            rm "$DESKTOP_ENTRY"
-            echo "Removed desktop entry"
-        fi
-    fi
+# Deactivate venv if active
+if [ -n "$VIRTUAL_ENV" ]; then
+    deactivate
+fi
 
-    echo "Uninstallation complete!"
-    echo "Backup available at: $backup_dir"
-}
+# Remove files with proper checks
+for dir in "$INSTALL_DIR/venv" "$INSTALL_DIR" "$APP_DIR" "$APP_DESKTOP"; do
+    [ -d "$dir" ] && rm -rf "$dir" && echo "Removed: $dir"
+done
 
-# Run with error handling
-trap 'echo "Uninstallation failed"; exit 1' ERR
-main
+# Remove desktop entries
+[ -f "$DESKTOP_ENTRY" ] && rm -f "$DESKTOP_ENTRY" && echo "Removed desktop entry"
+
+echo "Uninstallation complete!"
+[ -d "$BACKUP_DIR" ] && echo "Backup available at: $BACKUP_DIR"

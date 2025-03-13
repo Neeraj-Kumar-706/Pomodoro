@@ -126,7 +126,7 @@ If you would like to contribute to this project, please follow these steps:
 5. Commit your changes.
 6. Push your changes to your forked repository.
 7. Open a pull request.
-
+- **i am looking to collab on creating and testing of install,uninstall and run script for mac os and window please if can email me or just fork it**
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.

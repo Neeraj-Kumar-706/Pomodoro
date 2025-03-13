@@ -17,6 +17,17 @@ try {
         Write-Host "Removed app files from: $INSTALL_DIR"
     }
 
+    # Deactivate venv if active
+    if ($env:VIRTUAL_ENV) {
+        deactivate
+    }
+
+    # Remove installation with venv
+    if (Test-Path "$INSTALL_DIR\venv") {
+        Remove-Item -Path "$INSTALL_DIR\venv" -Recurse -Force
+        Write-Host "Removed virtual environment"
+    }
+
     # Remove shortcut if exists
     if (Test-Path $SHORTCUT) {
         Remove-Item -Path $SHORTCUT -Force

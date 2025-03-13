@@ -15,11 +15,11 @@ function Backup-ExistingInstall {
 function Check-Python {
     try {
         $version = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-        if ([version]$version -lt [version]"3.8") {
-            Write-Host "Python 3.8 or higher is required (found $version)"
-            return $false
+        if ([version]$version -ge [version]"3.8") {
+            return $true  # Python version is good
         }
-        return $true
+        Write-Host "Python 3.8 or higher is required (found $version)"
+        return $false
     }
     catch {
         Write-Host "Python is not installed"
@@ -53,7 +53,7 @@ try {
     }
 
     # Verify source files
-    if (-not (Test-Path "app-v3.py") -or -not (Test-Path "assets")) {
+    if (-not (Test-Path "draft.py") -or -not (Test-Path "assets")) {
         Write-Host "Error: Required files not found. Make sure you're in the correct directory."
         exit 1
     }
@@ -61,34 +61,35 @@ try {
     $INSTALL_DIR = Join-Path $env:LOCALAPPDATA "PomodoroTimer"
     Backup-ExistingInstall $INSTALL_DIR
 
+    # Store source directory
+    $SOURCE_DIR = $PWD.Path
+
     # Create and prepare installation directory
     New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
 
-    if (-not (Install-Dependencies)) {
-        exit 1
-    }
-
-    # Copy files with verification
+    # Copy files first
     Write-Host "Copying application files..."
-    Copy-Item "app-v3.py" -Destination $INSTALL_DIR -Force
-    Copy-Item "assets" -Destination $INSTALL_DIR -Recurse -Force
+    Copy-Item "$SOURCE_DIR\draft.py" -Destination "$INSTALL_DIR\draft.py" -Force
+    Copy-Item "$SOURCE_DIR\assets" -Destination $INSTALL_DIR -Recurse -Force
 
     # Create and activate virtual environment
     Write-Host "Creating virtual environment..."
-    python -m venv "$INSTALL_DIR\venv"
+    Push-Location $INSTALL_DIR
+    python -m venv venv
     
-    # Install dependencies from requirements.txt
+    # Install dependencies
     Write-Host "Installing dependencies..."
-    & "$INSTALL_DIR\venv\Scripts\pip" install ttkbootstrap pygame matplotlib chime
+    & ".\venv\Scripts\pip" install ttkbootstrap pygame matplotlib chime
     if (Test-Path "requirements.txt") {
-        & "$INSTALL_DIR\venv\Scripts\pip" install -r requirements.txt
+        & ".\venv\Scripts\pip" install -r requirements.txt
     }
+    Pop-Location
 
     # Create run script
     $runScript = @"
 @echo off
 call "$INSTALL_DIR\venv\Scripts\activate.bat"
-python "$INSTALL_DIR\app-v3.py"
+python "$INSTALL_DIR\draft.py"
 "@
     Set-Content -Path "$INSTALL_DIR\run.ps1" -Value $runScript
 
@@ -96,7 +97,7 @@ python "$INSTALL_DIR\app-v3.py"
     $WshShell = New-Object -comObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut("$Home\Desktop\PomodoroTimer.lnk")
     $Shortcut.TargetPath = "$INSTALL_DIR\venv\Scripts\pythonw.exe"
-    $Shortcut.Arguments = """$INSTALL_DIR\app-v3.py"""
+    $Shortcut.Arguments = """$INSTALL_DIR\draft.py"""
     $Shortcut.WorkingDirectory = $INSTALL_DIR
     $Shortcut.IconLocation = "$INSTALL_DIR\assets\time-organization.ico"
     $Shortcut.Save()

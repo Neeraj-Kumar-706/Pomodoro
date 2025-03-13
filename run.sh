@@ -1,35 +1,29 @@
 #!/bin/bash
+set -e
 
-# Get correct installation path
+# Get the installation path
 if [ "$(uname -s)" = "Darwin" ]; then
-    APP_DIR="$HOME/Library/Application Support/PomodoroTimer"
-    VENV_PATH="$APP_DIR/venv"
+    INSTALL_DIR="$HOME/Library/Application Support/PomodoroTimer"
+    APP_DIR="/Applications/PomodoroTimer.app"
+    # For Mac, run from the app bundle
+    MACOS_DIR="$APP_DIR/Contents/MacOS"
+    if [ -x "$MACOS_DIR/PomodoroTimer" ]; then
+        exec "$MACOS_DIR/PomodoroTimer"
+        exit 0
+    fi
 else
-    APP_DIR="$HOME/.local/share/PomodoroTimer"
-    VENV_PATH="$APP_DIR/venv"
+    INSTALL_DIR="$HOME/.local/share/PomodoroTimer"
+    # Verify paths
+    [ ! -d "$INSTALL_DIR" ] && { echo "Error: App not installed"; exit 1; }
+    [ ! -d "$INSTALL_DIR/venv" ] && { echo "Error: Virtual environment not found"; exit 1; }
+    [ ! -f "$INSTALL_DIR/draft.py" ] && { echo "Error: App script not found"; exit 1; }
+
+    # Run app
+    cd "$INSTALL_DIR" || exit 1
+    source "venv/bin/activate" || exit 1
+    python draft.py > /dev/null 2>&1 & disown
 fi
 
-# Verify installation and environment
-if [ ! -d "$APP_DIR" ] || [ ! -d "$VENV_PATH" ]; then
-    echo "Error: Installation not found or corrupted."
-    echo "Please run the installer again."
-    exit 1
-fi
-
-# Change to app directory with error handling
-cd "$APP_DIR" || { echo "Failed to change directory"; exit 1; }
-
-# Activate virtual environment with error checking
-source "$VENV_PATH/bin/activate" || { echo "Failed to activate virtual environment"; exit 1; }
-
-# Run app with proper output handling
-if [ "$(uname -s)" = "Darwin" ]; then
-    nohup python app-v3.py >/dev/null 2>&1 &
-else
-    python app-v3.py >/dev/null 2>&1 & disown
-fi
-
-deactivate
 exit 0
 
 

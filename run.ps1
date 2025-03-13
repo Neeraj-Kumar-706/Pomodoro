@@ -1,31 +1,27 @@
-# Get the installation directory
+$ErrorActionPreference = "Stop"
+
+# Match install script paths
 $INSTALL_DIR = Join-Path $env:LOCALAPPDATA "PomodoroTimer"
+$VENV_PATH = Join-Path $INSTALL_DIR "venv"
+$APP_PATH = Join-Path $INSTALL_DIR "draft.py"
 
-# Check if installation exists
+# Verify installation
 if (-not (Test-Path $INSTALL_DIR)) {
-    Write-Host "Pomodoro Timer is not installed. Please run the installer first."
-    exit 1
-}
-
-# Change to installation directory
-Set-Location $INSTALL_DIR
-
-# Check virtual environment
-if (-not (Test-Path "venv")) {
-    Write-Host "Virtual environment not found. Please reinstall the application."
+    Write-Host "Error: App not installed"
     exit 1
 }
 
 try {
-    # Activate virtual environment and run app
-    & ".\venv\Scripts\Activate.ps1"
-    Start-Process -NoNewWindow -FilePath "pythonw.exe" -ArgumentList "app-v3.py"
+    Push-Location $INSTALL_DIR
+    & "$VENV_PATH\Scripts\Activate.ps1"
+    
+    # Launch app using pythonw from venv
+    Start-Process -NoNewWindow -FilePath "$VENV_PATH\Scripts\pythonw.exe" -ArgumentList $APP_PATH
 }
 catch {
-    Write-Host "Error running application: $_"
+    Write-Host "Error launching app: $_"
     exit 1
 }
 finally {
-    # Deactivate venv (PowerShell handles this automatically)
-    exit 0
+    Pop-Location
 }

@@ -23,12 +23,18 @@ check_python() {
         echo "Python 3 is not installed"
         return 1
     fi
-    version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    if (( $(echo "$version < 3.8" | bc -l) )); then
-        echo "Python 3.8 or higher is required (found $version)"
+    
+    # Get major and minor version numbers
+    major=$(python3 -c 'import sys; print(sys.version_info.major)')
+    minor=$(python3 -c 'import sys; print(sys.version_info.minor)')
+    
+    # Simple numeric comparison
+    if [ "$major" -gt 3 ] || ([ "$major" -eq 3 ] && [ "$minor" -ge 8 ]); then
+        return 0  # Version is good
+    else
+        echo "Python 3.8 or higher is required (found ${major}.${minor})"
         return 1
     fi
-    return 0
 }
 
 # Backup existing installation
@@ -122,37 +128,41 @@ EOF
     fi
 
     # Verify source files exist
-    if [ ! -f "app-v3.py" ] || [ ! -d "assets" ]; then
+    if [ ! -f "draft.py" ] || [ ! -d "assets" ]; then
         echo "Error: Required files not found. Make sure you're in the correct directory."
         exit 1
     fi
+
+    # Store source directory
+    SOURCE_DIR="$(pwd)"
 
     # Create installation directory
     backup_existing "$INSTALL_DIR"
     mkdir -p "$INSTALL_DIR" || { echo "Failed to create installation directory"; exit 1; }
 
-    # Create and activate virtual environment
+    # Create and activate virtual environment in app directory
     echo "Creating virtual environment..."
-    $PYTHON_CMD -m venv "$INSTALL_DIR/venv"
-    source "$INSTALL_DIR/venv/bin/activate"
+    cd "$INSTALL_DIR" || exit 1
+    $PYTHON_CMD -m venv venv
+    source "venv/bin/activate"
 
     # Install dependencies from requirements.txt
     echo "Installing dependencies..."
-    if [ -f "requirements.txt" ]; then
-        pip install --user --no-cache-dir -r requirements.txt
+    if [ -f "$SOURCE_DIR/requirements.txt" ]; then
+        pip install -r "$SOURCE_DIR/requirements.txt"
     else
-        pip install --user --no-cache-dir ttkbootstrap pygame matplotlib chime
+        pip install ttkbootstrap pygame matplotlib chime
     fi
 
     # Copy files with error checking
     echo "Copying application files..."
     if [ "$OS" = "Darwin" ]; then
-        cp "app-v3.py" "$RESOURCES_DIR/" || exit 1
-        cp -r "assets" "$RESOURCES_DIR/" || exit 1
+        cp "$SOURCE_DIR/draft.py" "$RESOURCES_DIR/draft.py" || exit 1
+        cp -r "$SOURCE_DIR/assets" "$RESOURCES_DIR/" || exit 1
         chmod -R 755 "$APP_DIR" || exit 1
     else
-        cp "app-v3.py" "$INSTALL_DIR/" || exit 1
-        cp -r "assets" "$INSTALL_DIR/" || exit 1
+        cp "$SOURCE_DIR/draft.py" "$INSTALL_DIR/draft.py" || exit 1
+        cp -r "$SOURCE_DIR/assets" "$INSTALL_DIR/" || exit 1
         chmod -R 755 "$INSTALL_DIR" || exit 1
     fi
 
@@ -162,14 +172,14 @@ EOF
 #!/bin/bash
 cd "\$(dirname "\$0")"
 source "../Resources/venv/bin/activate"
-$PYTHON_CMD "../Resources/app-v3.py"
+$PYTHON_CMD "../Resources/draft.py"
 EOF
     else
         cat > "$INSTALL_DIR/run.sh" << EOF
 #!/bin/bash
 cd "\$(dirname "\$0")"
 source "./venv/bin/activate"
-python app-v3.py
+python draft.py
 EOF
         chmod +x "$INSTALL_DIR/run.sh"
         
