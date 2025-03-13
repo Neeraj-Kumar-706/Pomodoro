@@ -1,34 +1,34 @@
 #!/bin/bash
 
-# Get the absolute path to the installation directory
+# Get correct installation path
 if [ "$(uname -s)" = "Darwin" ]; then
-    APP_DIR="$HOME/Applications/PomodoroTimer"
+    APP_DIR="$HOME/Library/Application Support/PomodoroTimer"
+    VENV_PATH="$APP_DIR/venv"
 else
     APP_DIR="$HOME/.local/share/PomodoroTimer"
+    VENV_PATH="$APP_DIR/venv"
 fi
 
-# Check if installation exists
-if [ ! -d "$APP_DIR" ]; then
-    echo "Pomodoro Timer is not installed. Please run the installer first."
+# Verify installation and environment
+if [ ! -d "$APP_DIR" ] || [ ! -d "$VENV_PATH" ]; then
+    echo "Error: Installation not found or corrupted."
+    echo "Please run the installer again."
     exit 1
 fi
 
-# Check virtual environment
-if [ ! -d "$APP_DIR/venv" ]; then
-    echo "Virtual environment not found. Please reinstall the application."
-    exit 1
+# Change to app directory with error handling
+cd "$APP_DIR" || { echo "Failed to change directory"; exit 1; }
+
+# Activate virtual environment with error checking
+source "$VENV_PATH/bin/activate" || { echo "Failed to activate virtual environment"; exit 1; }
+
+# Run app with proper output handling
+if [ "$(uname -s)" = "Darwin" ]; then
+    nohup python app-v3.py >/dev/null 2>&1 &
+else
+    python app-v3.py >/dev/null 2>&1 & disown
 fi
 
-# Change to app directory
-cd "$APP_DIR" || exit 1
-
-# Activate virtual environment and run app
-source "venv/bin/activate"
-
-# Run the app in background and disown
-python app-v3.py > /dev/null 2>&1 & disown
-
-# Deactivate venv and exit terminal
 deactivate
 exit 0
 

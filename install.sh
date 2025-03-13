@@ -53,11 +53,11 @@ main() {
     # Detect OS
     OS="$(uname -s)"
     if [ "$OS" = "Darwin" ]; then
-        INSTALL_DIR="$HOME/Applications/PomodoroTimer"  # Changed to standard Mac apps location
+        INSTALL_DIR="$HOME/Library/Application Support/PomodoroTimer"  # Proper Mac app location
+        APP_DIR="/Applications/PomodoroTimer.app"  # Standard Mac app location
         PYTHON_CMD="python3"
         
         # Create Mac app structure
-        APP_DIR="$HOME/Desktop/PomodoroTimer.app"
         CONTENTS_DIR="$APP_DIR/Contents"
         MACOS_DIR="$CONTENTS_DIR/MacOS"
         RESOURCES_DIR="$CONTENTS_DIR/Resources"
@@ -81,6 +81,10 @@ main() {
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+    <key>LSBackgroundOnly</key>
+    <string>0</string>
 </dict>
 </plist>
 EOF
@@ -99,17 +103,22 @@ EOF
         INSTALL_DIR="$HOME/.local/share/PomodoroTimer"
         PYTHON_CMD="python3"
         
+        # Create XDG directories if they don't exist
+        mkdir -p "$HOME/.local/share/applications"
+        
         # Create Linux desktop entry
-        cat > "$HOME/Desktop/PomodoroTimer.desktop" << EOF
+        cat > "$HOME/.local/share/applications/pomodoro-timer.desktop" << EOF
 [Desktop Entry]
+Version=1.0
 Name=Pomodoro Timer
-Exec=$PYTHON_CMD "$INSTALL_DIR/app-v3.py"
-Type=Application
-Terminal=false
+Comment=Pomodoro Timer Application
+Exec=bash -c 'cd "$INSTALL_DIR" && source venv/bin/activate && python app-v3.py'
 Icon=$INSTALL_DIR/assets/time-organization.png
+Terminal=false
+Type=Application
 Categories=Utility;
 EOF
-        chmod +x "$HOME/Desktop/PomodoroTimer.desktop"
+        chmod +x "$HOME/.local/share/applications/pomodoro-timer.desktop"
     fi
 
     # Verify source files exist
@@ -130,9 +139,9 @@ EOF
     # Install dependencies from requirements.txt
     echo "Installing dependencies..."
     if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt
+        pip install --user --no-cache-dir -r requirements.txt
     else
-        pip install ttkbootstrap pygame matplotlib chime
+        pip install --user --no-cache-dir ttkbootstrap pygame matplotlib chime
     fi
 
     # Copy files with error checking
@@ -165,7 +174,7 @@ EOF
         chmod +x "$INSTALL_DIR/run.sh"
         
         # Update desktop entry
-        sed -i "s|Exec=.*|Exec=$INSTALL_DIR/run.sh|" "$HOME/Desktop/PomodoroTimer.desktop"
+        sed -i "s|Exec=.*|Exec=$INSTALL_DIR/run.sh|" "$HOME/.local/share/applications/pomodoro-timer.desktop"
     fi
 
     echo "Installation complete! App installed to: $INSTALL_DIR"

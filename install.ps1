@@ -42,6 +42,12 @@ function Install-Dependencies {
 
 # Main installation
 try {
+    # Request admin rights if needed
+    if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        Start-Process powershell.exe "-File",($MyInvocation.MyCommand.Path) -Verb RunAs
+        exit
+    }
+
     if (-not (Check-Python)) {
         exit 1
     }
@@ -86,18 +92,20 @@ python "$INSTALL_DIR\app-v3.py"
 "@
     Set-Content -Path "$INSTALL_DIR\run.ps1" -Value $runScript
 
-    # Create shortcut with error handling
-    try {
-        $WshShell = New-Object -comObject WScript.Shell
-        $Shortcut = $WshShell.CreateShortcut("$Home\Desktop\PomodoroTimer.lnk")
-        $Shortcut.TargetPath = "powershell.exe"
-        $Shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$INSTALL_DIR\run.ps1`""
-        $Shortcut.WorkingDirectory = $INSTALL_DIR
-        $Shortcut.Save()
-    }
-    catch {
-        Write-Host "Warning: Failed to create desktop shortcut: $_"
-    }
+    # Create proper Windows shortcut
+    $WshShell = New-Object -comObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut("$Home\Desktop\PomodoroTimer.lnk")
+    $Shortcut.TargetPath = "$INSTALL_DIR\venv\Scripts\pythonw.exe"
+    $Shortcut.Arguments = """$INSTALL_DIR\app-v3.py"""
+    $Shortcut.WorkingDirectory = $INSTALL_DIR
+    $Shortcut.IconLocation = "$INSTALL_DIR\assets\time-organization.ico"
+    $Shortcut.Save()
+
+    # Register in Windows Apps
+    $AppPath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\App Paths\PomodoroTimer.exe"
+    New-Item -Path $AppPath -Force | Out-Null
+    Set-ItemProperty -Path $AppPath -Name "(Default)" -Value "$INSTALL_DIR\venv\Scripts\pythonw.exe"
+    Set-ItemProperty -Path $AppPath -Name "Path" -Value $INSTALL_DIR
 
     Write-Host "Installation complete! App installed to: $INSTALL_DIR"
 }
