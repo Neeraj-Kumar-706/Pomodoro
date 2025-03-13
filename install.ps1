@@ -48,44 +48,38 @@ try {
         exit
     }
 
+    # Verify Python first
     if (-not (Check-Python)) {
+        Write-Host "Python check failed. Installation aborted."
         exit 1
     }
 
-    # Verify source files
-    if (-not (Test-Path "draft.py") -or -not (Test-Path "assets")) {
+    # Store source directory and verify files
+    $SOURCE_DIR = $PWD.Path
+    if (-not (Test-Path "$SOURCE_DIR\draft.py") -or -not (Test-Path "$SOURCE_DIR\assets")) {
         Write-Host "Error: Required files not found. Make sure you're in the correct directory."
         exit 1
     }
 
+    # Setup installation directory
     $INSTALL_DIR = Join-Path $env:LOCALAPPDATA "PomodoroTimer"
     Backup-ExistingInstall $INSTALL_DIR
-
-    # Store source directory
-    $SOURCE_DIR = $PWD.Path
-
-    # Copy files first
-    Write-Host "Copying application files..."
-    Copy-Item "$SOURCE_DIR\draft.py" -Destination "$INSTALL_DIR\app-v3.py" -Force
-    Copy-Item "$SOURCE_DIR\assets" -Destination $INSTALL_DIR -Recurse -Force
-
-    # Create and prepare installation directory
     New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
 
-    # Create and activate virtual environment
-    Write-Host "Creating virtual environment..."
+    # Create and setup virtual environment
+    Write-Host "Setting up Python environment..."
     Push-Location $INSTALL_DIR
     python -m venv venv
-    
-    # Install dependencies
-    Write-Host "Installing dependencies..."
+    & ".\venv\Scripts\Activate.ps1"
     & ".\venv\Scripts\pip" install ttkbootstrap pygame matplotlib chime
-    if (Test-Path "requirements.txt") {
-        & ".\venv\Scripts\pip" install -r requirements.txt
-    }
     Pop-Location
 
-    # Create initial settings.json with empty rain sound path
+    # Copy application files
+    Write-Host "Installing application files..."
+    Copy-Item "$SOURCE_DIR\draft.py" -Destination "$INSTALL_DIR\app-v3.py" -Force
+    Copy-Item "$SOURCE_DIR\assets" -Destination "$INSTALL_DIR" -Recurse -Force
+
+    # Create settings file
     $settings = @{
         pomodoro = 25
         short_break = 5
@@ -97,30 +91,15 @@ try {
     }
     $settings | ConvertTo-Json | Set-Content "$INSTALL_DIR\settings.json"
 
-    # Create run script
-    $runScript = @"
-@echo off
-call "$INSTALL_DIR\venv\Scripts\activate.bat"
-python "$INSTALL_DIR\app-v3.py"
-"@
-    Set-Content -Path "$INSTALL_DIR\run.ps1" -Value $runScript
-
-    # Create proper Windows shortcut
+    # Create shortcut
     $WshShell = New-Object -comObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut("$Home\Desktop\PomodoroTimer.lnk")
     $Shortcut.TargetPath = "$INSTALL_DIR\venv\Scripts\pythonw.exe"
-    $Shortcut.Arguments = """$INSTALL_DIR\app-v3.py"""
+    $Shortcut.Arguments = "$INSTALL_DIR\app-v3.py"
     $Shortcut.WorkingDirectory = $INSTALL_DIR
-    $Shortcut.IconLocation = "$INSTALL_DIR\assets\time-organization.ico"
     $Shortcut.Save()
 
-    # Register in Windows Apps
-    $AppPath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\App Paths\PomodoroTimer.exe"
-    New-Item -Path $AppPath -Force | Out-Null
-    Set-ItemProperty -Path $AppPath -Name "(Default)" -Value "$INSTALL_DIR\venv\Scripts\pythonw.exe"
-    Set-ItemProperty -Path $AppPath -Name "Path" -Value $INSTALL_DIR
-
-    Write-Host "Installation complete! App installed to: $INSTALL_DIR"
+    Write-Host "Installation complete! You can find PomodoroTimer on your desktop."
 }
 catch {
     Write-Host "Installation failed: $_"
