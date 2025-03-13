@@ -10,24 +10,14 @@ if (-not (Test-Path $INSTALL_DIR)) {
     Write-Host "Error: App not installed."
     exit 1
 }
-if (-not (Test-Path $APP_PATH)) {
-    Write-Host "Error: App file missing."
-    exit 1
-}
-if (-not (Test-Path "$VENV_PATH\Scripts\pythonw.exe")) {
-    Write-Host "Error: Python environment not found."
-    exit 1
-}
 
 try {
     # Change to installation directory
     Set-Location $INSTALL_DIR
     
-    # Start app without console window
-    Start-Process -WindowStyle Hidden `
-                 -FilePath "$VENV_PATH\Scripts\pythonw.exe" `
-                 -ArgumentList "$APP_PATH" `
-                 -WorkingDirectory $INSTALL_DIR
+    # Activate virtual environment and run app
+    & "$VENV_PATH\Scripts\Activate.ps1"
+    & "$VENV_PATH\Scripts\pythonw.exe" "$APP_PATH"
 }
 catch {
     Write-Host "Error launching app: $_"

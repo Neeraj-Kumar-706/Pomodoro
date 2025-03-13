@@ -91,12 +91,22 @@ try {
     }
     $settings | ConvertTo-Json | Set-Content "$INSTALL_DIR\settings.json"
 
-    # Create shortcut
+    # Create run script
+    $runScript = @"
+@echo off
+cd "$INSTALL_DIR"
+call "$INSTALL_DIR\venv\Scripts\activate.bat"
+start /B "" "$INSTALL_DIR\venv\Scripts\pythonw.exe" "$INSTALL_DIR\app-v3.py"
+"@
+    Set-Content -Path "$INSTALL_DIR\run.bat" -Value $runScript -Encoding ASCII
+
+    # Create proper Windows shortcut
     $WshShell = New-Object -comObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut("$Home\Desktop\PomodoroTimer.lnk")
-    $Shortcut.TargetPath = "$INSTALL_DIR\venv\Scripts\pythonw.exe"
-    $Shortcut.Arguments = "$INSTALL_DIR\app-v3.py"
+    $Shortcut.TargetPath = "$INSTALL_DIR\run.bat"
     $Shortcut.WorkingDirectory = $INSTALL_DIR
+    $Shortcut.WindowStyle = 7  # Minimized
+    $Shortcut.IconLocation = "$INSTALL_DIR\assets\time-organization.ico"
     $Shortcut.Save()
 
     Write-Host "Installation complete! You can find PomodoroTimer on your desktop."
