@@ -4,7 +4,6 @@ from ttkbootstrap import Style, ttk
 from tkinter import messagebox
 import threading
 import time
-import pygame
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from collections import deque
@@ -13,6 +12,7 @@ import json
 import os
 import chime
 import sys
+import importlib
 
 
 # Add error handling utility
@@ -32,7 +32,6 @@ class PomodoroTimer:
         self.sessions_completed = 0
         self.load_state()  # This will now properly override auto_switch from session state
         self.historical_data = self.load_historical_data()
-        self._cached_daily_time = 0  # Add caching
         self._last_save_time = 0
         self.save_interval = 5  # Save state every 5 seconds
 
@@ -192,29 +191,53 @@ class PomodoroTimerGUI:
         self.timer = PomodoroTimer()
         self.auto_switch_var = tk.BooleanVar(value=self.timer.auto_switch)  # Set initial value here
         self.setup_gui()
+        self.setup_audio()
+        self.initialize_state()
 
-        self.rain_sound = os.path.join(
-            os.path.dirname(__file__), "assets/rain_sound.mp3"
-        )
-        
+    def setup_audio(self):
+        """Initialize audio-related attributes"""
+        self.rain_sound = os.path.join(os.path.dirname(__file__), "assets/rain_sound.mp3")
+        self.is_playing = False
+        self.is_user_playsound = False
+        self.pygame_initialized = False
+        self.pygame = None  # Add pygame attribute
+        chime.theme("big-sur")
+
+    def _load_pygame(self):
+        """Lazy load pygame module"""
+        if not self.pygame_initialized:
+            try:
+                # Suppress pygame startup message
+                original_stdout = sys.stdout
+                sys.stdout = open(os.devnull, "w")
+                
+                # Lazy import pygame
+                self.pygame = importlib.import_module('pygame')
+                self.pygame.mixer.init()
+                
+                sys.stdout = original_stdout
+                self.pygame_initialized = True
+                return True
+            except Exception as e:
+                sys.stdout = original_stdout
+                print(f"Failed to initialize sound system: {e}")
+                messagebox.showerror("Sound Error", "Failed to initialize sound system")
+                return False
+        return True
+
+    def initialize_state(self):
+        """Initialize timer state"""
         self.timer_thread = None
         self.is_running = False
         self.is_paused = False
         self.should_stop = threading.Event()
-        self.is_playing = False
-        self.is_user_playsound = False
-        self.play_obj = None
-        self.play_thread = None
-        self.stop_playback = threading.Event()
-        self.pygame_initialized = False  # Add pygame initialization flag
-        chime.theme("big-sur")
-        self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
-
-        self.check_date()  # Add date check on startup
-        self.update_initial_display()  # Add this line to update display on startup
         self._display_update_pending = False
         self._last_display_update = 0
-        self.display_update_interval = 0.5  # Update display every 0.5 seconds
+        self.display_update_interval = 0.5
+        
+        self.check_date()
+        self.update_initial_display()
+        self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def update_initial_display(self):
         """Update all displays with saved session data on app startup"""
@@ -374,31 +397,16 @@ class PomodoroTimerGUI:
             self.play_rain_sound()
 
     def play_rain_sound(self):
-        def _init_pygame():
-            if not self.pygame_initialized:
-                try:
-                    original_stdout = sys.stdout
-                    sys.stdout = open(os.devnull, "w")
-                    pygame.mixer.init()
-                    sys.stdout = original_stdout
-                    self.pygame_initialized = True
-                    return True
-                except Exception as e:
-                    print(f"Failed to initialize sound system: {e}")
-                    messagebox.showerror("Sound Error", "Failed to initialize sound system")
-                    return False
-            return True
-
         try:
             if not os.path.exists(self.rain_sound):
                 messagebox.showerror("File Error", "Rain sound file not found")
                 return
 
-            if not _init_pygame():
+            if not self._load_pygame():
                 return
 
-            pygame.mixer.music.load(self.rain_sound)
-            pygame.mixer.music.play(-1)
+            self.pygame.mixer.music.load(self.rain_sound)
+            self.pygame.mixer.music.play(-1)
             self.is_playing = True
             self.play_sound_button.config(text="Stop Sound", style="danger.TButton")
         except Exception as e:
@@ -406,13 +414,23 @@ class PomodoroTimerGUI:
             messagebox.showerror("Sound Error", "Failed to play sound")
             self.is_playing = False
 
-    def change_volume(self, value):
-        volume = float(value) / 100
-        self.timer.sound_volume = volume
-        pygame.mixer.music.set_volume(volume)
-        self.timer.save_settings()
+    def stop_rain_sound(self):
+        """Stop the rain sound playback"""
+        if self.pygame_initialized and self.is_playing:
+            try:
+                self.pygame.mixer.music.stop()
+                self.is_playing = False
+                self.play_sound_button.config(text="Play Sound", style="primary.TButton")
+            except Exception as e:
+                print(f"Error stopping sound: {e}")
 
-    # replace below method with new
+    def change_volume(self, value):
+        if self.pygame_initialized:
+            volume = float(value) / 100
+            self.timer.sound_volume = volume
+            self.pygame.mixer.music.set_volume(volume)
+            self.timer.save_settings()
+
     def toggle_timer(self):
         if self.is_running:
             if self.is_paused:
@@ -424,69 +442,139 @@ class PomodoroTimerGUI:
                 chime.info()
                 self.start_button.config(text="Resume")
         else:
+            # Reset timer if it's at 0
+            if self.timer.current_time <= 0:
+                self.timer.current_time = self.timer.get_mode_time()
+                self.update_display()
+            
             self.is_running = True
             self.is_paused = False
+            self.should_stop.clear()  # Clear stop flag
             chime.info()
             self.start_button.config(text="Pause")
             self.timer_thread = threading.Thread(target=self.run_timer)
-
             self.timer_thread.start()
-        self.timer.save_state()  # Save state after timer changes
+        self.timer.save_state()
 
     def run_timer(self):
-        """Optimized timer with better error handling"""
-        accumulated_time = 0
+        """Optimized timer loop"""
         last_update = time.time()
+        accumulated_time = 0
         
-        try:
-            while not self.should_stop.is_set() and self.timer.current_time > 0:
-                if not self.is_paused:
-                    try:
-                        current = time.time()
-                        elapsed = current - last_update
-                        accumulated_time += elapsed
-                        
-                        if accumulated_time >= 1.0:
-                            seconds_to_subtract = int(accumulated_time)
-                            self.timer.current_time = max(0, self.timer.current_time - seconds_to_subtract)
-                            if self.timer.mode == "Pomodoro":
-                                self.timer.total_pomodoro_time += seconds_to_subtract
-                            accumulated_time -= seconds_to_subtract
-                            safe_operation(
-                                lambda: self.master.after(0, self.update_display),
-                                "Failed to update display"
-                            )
-                        
-                        last_update = current
-                    except Exception as e:
-                        print(f"Timer iteration error: {e}")
-                        time.sleep(0.1)  # Prevent rapid error loops
-                time.sleep(0.05)
+        while not self.should_stop.is_set() and self.timer.current_time > 0:
+            if self.is_paused:
+                time.sleep(0.1)
+                continue
 
-        except Exception as e:
-            print(f"Critical timer error: {e}")
-            messagebox.showerror("Error", "Timer encountered an error and had to stop")
-        finally:
-            if not self.should_stop.is_set():
-                safe_operation(
-                    lambda: self.master.after(0, self.timer_completed),
-                    "Failed to complete timer normally"
-                )
+            current = time.time()
+            accumulated_time += current - last_update
+            last_update = current
+
+            if accumulated_time >= 1.0:
+                seconds = int(accumulated_time)
+                self.timer.current_time = max(0, self.timer.current_time - seconds)
+                
+                if self.timer.mode == "Pomodoro":
+                    self.timer.total_pomodoro_time += seconds
+                
+                accumulated_time -= seconds
+                
+                if self.timer.current_time <= 0:
+                    self.master.after(0, self.timer_completed)
+                    break
+                
+                self.master.after(0, self.update_display)
+
+            time.sleep(0.05)
+
+    def timer_completed(self):
+        """Streamlined timer completion handler"""
+        self.is_running = False
+        self.update_display()
+        
+        was_playing = self.is_playing
+        self.stop_rain_sound()
+        chime.success()
+
+        next_mode = self.get_next_mode()
+        
+        if not self.timer.auto_switch:
+            self.show_completion_message()
+        
+        def switch_with_state():
+            self.switch_mode(next_mode)
+            if was_playing or self.is_user_playsound:
+                self.play_rain_sound()
+        
+        if self.timer.mode == "Pomodoro":
+            self.update_pomodoro_completion()
+        
+        self.master.after(500, switch_with_state)
+        self.timer.save_state()
+
+    def get_next_mode(self):
+        """Determine next timer mode"""
+        if self.timer.mode == "Pomodoro":
+            return "Long Break" if self.timer.pomodoro_count % 4 == 0 else "Short Break"
+        return "Pomodoro"
+
+    def show_completion_message(self):
+        """Show appropriate completion message"""
+        if self.timer.mode == "Pomodoro":
+            messagebox.showinfo("Pomodoro Complete", "Well done! Time for a break!")
+        else:
+            messagebox.showinfo("Break Complete", "Break finished! Time to work!")
+
+    def update_pomodoro_completion(self):
+        """Update pomodoro completion state"""
+        self.timer.pomodoro_count += 1
+        if self.timer.total_pomodoro_time >= 1800:
+            self.timer.sessions_completed += 1
+            self.timer.total_pomodoro_time = 0
+        self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
+        self.update_historical_data()
+
+    def switch_mode(self, new_mode):
+        """Enhanced mode switching with proper state management"""
+        # Stop current timer thread
+        self.is_running = False
+        self.should_stop.set()
+        if self.timer_thread and self.timer_thread.is_alive():
+            self.timer_thread.join(timeout=1)
+        
+        # Update mode and reset state
+        self.timer.mode = new_mode
+        self.mode_var.set(new_mode)
+        self.timer.current_time = self.timer.get_mode_time()
+        self.should_stop.clear()
+        
+        # Update display before starting new timer
+        self.update_display()
+        
+        # Start new timer thread
+        self.is_running = True
+        self.is_paused = False
+        self.start_button.config(text="Pause")
+        self.timer_thread = threading.Thread(target=self.run_timer)
+        self.timer_thread.start()
 
     def reset_timer(self):
+        """Enhanced reset with proper thread cleanup"""
         self.is_running = False
         self.is_paused = False
         self.should_stop.set()
-        chime.success()
+        chime.warning()
+        
         if self.timer_thread and self.timer_thread.is_alive():
             self.timer_thread.join(timeout=1)
-        self.should_stop.clear()
+            
+        self.should_stop.clear()  # Clear stop flag
         self.timer.current_time = self.timer.get_mode_time()
         self.start_button.config(text="Start")
         self.update_display()
 
     def change_mode(self, *args):
-        chime.warning()
+        chime.warning()  # Audio feedback for mode change
         self.timer.mode = self.mode_var.get()
         self.reset_timer()
 
@@ -559,49 +647,6 @@ class PomodoroTimerGUI:
         mega_progress = min(100, (daily_time / self.timer.mega_goal) * 100)
         self.mega_goal_progress["value"] = mega_progress
 
-    def timer_completed(self):
-        if self.timer.mode == "Pomodoro":
-            self.timer.pomodoro_count += 1
-            # Increment sessions_completed when a Pomodoro is finished
-            if self.timer.total_pomodoro_time >= 1800:  # 30 minutes (one session)
-                self.timer.sessions_completed += 1
-                self.timer.total_pomodoro_time = 0  # Reset for next session
-            next_mode = "Long Break" if self.timer.pomodoro_count % 4 == 0 else "Short Break"
-            self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
-            self.stop_rain_sound()
-            chime.success()
-            if self.timer.auto_switch:
-                self.switch_mode(next_mode)
-            else:
-                messagebox.showinfo(
-                    "Pomodoro Complete",
-                    "Well done! Time for a break!"
-                )
-                self.switch_mode(next_mode)
-            self.update_historical_data()
-            self.timer.save_state()  # Save the updated state
-        else:
-            self.stop_rain_sound()
-            chime.success()
-            if self.timer.auto_switch:
-                self.switch_mode("Pomodoro")
-            else:
-                messagebox.showinfo(
-                    "Break Complete",
-                    "Break finished! Time to work!"
-                )
-                self.switch_mode("Pomodoro")
-        
-        if self.is_user_playsound:
-            self.play_rain_sound()
-        self.timer.save_state()  # Save state after completion
-
-    def switch_mode(self, new_mode):
-        self.timer.mode = new_mode
-        self.mode_var.set(new_mode)
-        self.reset_timer()
-        self.toggle_timer()
-
     def update_historical_data(self):
         today = datetime.date.today()
         try:
@@ -628,6 +673,7 @@ class PomodoroTimerGUI:
             messagebox.showerror("Error", "Failed to update history")
 
     def open_settings(self):
+        chime.info()  # Audio feedback for opening settings
         settings_window = tk.Toplevel(self.master)
         settings_window.title("Settings")
         settings_window.geometry("300x500")
@@ -742,7 +788,9 @@ class PomodoroTimerGUI:
             pass
 
     def open_history(self):
+        chime.info()  # Audio feedback for opening history
         if not self.timer.historical_data:
+            chime.warning()  # Audio feedback for no history
             messagebox.showinfo("History", "No history data available")
             return
 
@@ -817,7 +865,7 @@ class PomodoroTimerGUI:
             
             if self.pygame_initialized:
                 try:
-                    pygame.mixer.quit()
+                    self.pygame.mixer.quit()
                 except:
                     pass
             
