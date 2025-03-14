@@ -464,58 +464,111 @@ class PomodoroTimerGUI:
         self.timer.save_state()
 
     def run_timer(self):
-        """Fixed timer with consistent speed regardless of pause state"""
-        target_interval = 1.0  # Target 1 second intervals
+        """Fixed timer with consistent speed and proper time tracking"""
+        target_interval = 1.0
         last_tick = time.time()
         
-        while not self.should_stop.is_set() and self.timer.current_time > 0:
+        while not self.should_stop.is_set() and self.timer.current_time > 0:  # Changed back to > 0
             current_time = time.time()
             
             if self.is_paused:
-                last_tick = current_time  # Reset reference time when paused
+                last_tick = current_time
                 time.sleep(0.1)
                 continue
             
             elapsed = current_time - last_tick
             if elapsed >= target_interval:
+                # Update timer first
                 self.timer.current_time = max(0, self.timer.current_time - 1)
+                self.master.after(0, self.update_display)
                 
+                # Handle Pomodoro mode updates
                 if self.timer.mode == "Pomodoro":
                     self.timer.total_pomodoro_time += 1
-                    # Update total time label immediately
                     self.master.after(0, self.update_total_time_label)
+                    
+                    # Check for session completion
+                    if self.timer.total_pomodoro_time % 1800 == 0:
+                        self.timer.sessions_completed += 1
+                        self.master.after(0, self.update_session_display)
                 
-                if self.timer.current_time <= 0:
-                    self.master.after(0, self.timer_completed)
+                # Check completion after updates
+                if self.timer.current_time == 0:  # Changed to exact equality
+                    self.master.after(0, self._handle_completion)
                     break
                 
-                self.master.after(0, self.update_display)
                 last_tick = current_time
             
             sleep_time = max(0.01, min(0.1, target_interval - (time.time() - current_time)))
             time.sleep(sleep_time)
 
-    def timer_completed(self):
-        """Streamlined timer completion handler"""
+    def _handle_completion(self):
+        """Internal method to handle timer completion with proper order"""
+        if not self.master.winfo_exists():
+            return
+            
+        # Stop timer immediately
         self.is_running = False
-        self.update_display()
+        self.should_stop.set()
         
+        # Save current state
         was_playing = self.is_playing
-        self.stop_rain_sound()
-        chime.success()
-
-        next_mode = self.get_next_mode()
+        current_mode = self.timer.mode
         
+        # Handle sound
+        if self.is_playing:
+            self.stop_rain_sound()
+        chime.success()
+        
+        # Update pomodoro count first if needed
+        if current_mode == "Pomodoro":
+            self.update_pomodoro_completion()
+        
+        # Show message if not auto-switching
         if not self.timer.auto_switch:
             self.show_completion_message()
         
+        # Switch mode last
+        next_mode = self.get_next_mode()
         def switch_with_state():
-            self.switch_mode(next_mode)
-            if was_playing or self.is_user_playsound:
-                self.play_rain_sound()
+            if self.master.winfo_exists():
+                self.switch_mode(next_mode)
+                if was_playing or self.is_user_playsound:
+                    self.play_rain_sound()
         
+        self.master.after(500, switch_with_state)
+        self.timer.save_state()
+
+    def timer_completed(self):
+        """Streamlined timer completion handler"""
+        if not self.master.winfo_exists():
+            return
+            
+        self.is_running = False
+        was_playing = self.is_playing
+        
+        # Stop sound and play completion chime
+        if self.is_playing:
+            self.stop_rain_sound()
+        chime.success()
+        
+        # Show completion message before mode switch if not auto-switching
+        if not self.timer.auto_switch:
+            self.show_completion_message()
+            
+        # Get next mode
+        next_mode = self.get_next_mode()
+        
+        # Update pomodoro count if needed
         if self.timer.mode == "Pomodoro":
             self.update_pomodoro_completion()
+        
+        # Switch mode after a short delay
+        def switch_with_state():
+            if self.master.winfo_exists():  # Check if window still exists
+                self.switch_mode(next_mode)
+                if was_playing or self.is_user_playsound:
+                    self.play_rain_sound()
         
         self.master.after(500, switch_with_state)
         self.timer.save_state()
@@ -536,11 +589,31 @@ class PomodoroTimerGUI:
     def update_pomodoro_completion(self):
         """Update pomodoro completion state"""
         self.timer.pomodoro_count += 1
-        if self.timer.total_pomodoro_time >= 1800:
-            self.timer.sessions_completed += 1
-            self.timer.total_pomodoro_time = 0
         self.pomodoro_count_label.config(text=f"Pomodoros: {self.timer.pomodoro_count}")
         self.update_historical_data()
+        self.timer.save_state()
+
+    def update_session_display(self):
+        """Update session display independently"""
+        sessions_done = self.timer.sessions_completed
+        total_sessions = int((self.timer.mega_goal / 3600) * 2)  # 2 sessions per hour
+        
+        # Update session counter and progress bar
+        self.session_label.config(
+            text=f"Sessions: {sessions_done}/{total_sessions}",
+            foreground="lime" if sessions_done >= total_sessions else "white"
+        )
+        self.session_progress["value"] = min(100, (sessions_done / total_sessions) * 100)
+        
+        # Update progress dots
+        for i, dot in enumerate(self.progress_dots):
+            if i < total_sessions:
+                dot.configure(
+                    foreground="lime" if i < sessions_done else "gray",
+                    text="●"
+                )
+            else:
+                dot.configure(text=" ")
 
     def switch_mode(self, new_mode):
         """Enhanced mode switching with proper state management"""
@@ -567,7 +640,11 @@ class PomodoroTimerGUI:
         self.timer_thread.start()
 
     def reset_timer(self):
-        """Enhanced reset with proper thread cleanup"""
+        """Enhanced reset with proper thread cleanup and immediate display update"""
+        # Store the current total time and session state before reset
+        current_total = self.timer.total_pomodoro_time
+        current_sessions = self.timer.sessions_completed
+        
         self.is_running = False
         self.is_paused = False
         self.should_stop.set()
@@ -576,10 +653,19 @@ class PomodoroTimerGUI:
         if self.timer_thread and self.timer_thread.is_alive():
             self.timer_thread.join(timeout=1)
             
-        self.should_stop.clear()  # Clear stop flag
+        self.should_stop.clear()
         self.timer.current_time = self.timer.get_mode_time()
         self.start_button.config(text="Start")
+        
+        # Restore the total time and session state
+        self.timer.total_pomodoro_time = current_total
+        self.timer.sessions_completed = current_sessions
+        
+        # Force immediate display update
+        self.timer_label.config(text=self.format_time(self.timer.current_time))
+        self.progress_bar["value"] = 0
         self.update_display()
+        self.timer.save_state()
 
     def change_mode(self, *args):
         chime.warning()  # Audio feedback for mode change
@@ -587,6 +673,7 @@ class PomodoroTimerGUI:
         self.reset_timer()
 
     def update_display(self):
+        """Modified update_display with improved session tracking"""
         if self._display_update_pending:
             return
         
@@ -605,38 +692,18 @@ class PomodoroTimerGUI:
             current_progress = (1 - current_time / mode_time) * 100
             self.progress_bar["value"] = current_progress
 
-            # Update session progress only if in Pomodoro mode
+            # Update total time display if in Pomodoro mode
             if self.timer.mode == "Pomodoro":
-                daily_time = self.timer._daily_time + self.timer.total_pomodoro_time
-                sessions_done = self.timer.sessions_completed  # Use saved sessions instead of calculating
-                total_sessions = int((self.timer.mega_goal / 3600) * 2)
-                
-                # Update session counter and progress bar
-                self.session_label.config(
-                    text=f"Sessions: {sessions_done}/{total_sessions}",
-                    foreground="lime" if sessions_done >= total_sessions else "white"
-                )
-                self.session_progress["value"] = min(100, (sessions_done / total_sessions) * 100)
-                
-                # Update progress dots with saved session state
-                for i, dot in enumerate(self.progress_dots):
-                    if i < total_sessions:
-                        dot.configure(
-                            foreground="lime" if i < sessions_done else "gray",
-                            text="●"
-                        )
-                    else:
-                        dot.configure(text=" ")
-
-                # Check for goal completion
-                if not hasattr(self, '_goal_reached') and daily_time >= self.timer.mega_goal:
-                    self._goal_reached = True
-                    messagebox.showinfo("Congratulations!", "You've reached your daily mega goal! 🎉")
-            
-            # Update total time label
-            self.update_total_time_label()
+                if not hasattr(self, '_last_total_time') or self._last_total_time != self.timer.total_pomodoro_time:
+                    self._last_total_time = self.timer.total_pomodoro_time
+                    self.update_total_time_label()
+                    
+                    # Check for session completion
+                    if self.timer.total_pomodoro_time > 0 and self.timer.total_pomodoro_time % 1800 == 0:
+                        self.update_session_display()
 
             self._last_display_update = current_time
+            
         finally:
             self._display_update_pending = False
 
@@ -800,14 +867,15 @@ class PomodoroTimerGUI:
                 )
 
     def update_total_time_label(self):
+        """Enhanced total time label update"""
         if not self.master.winfo_exists():
             return
 
         try:
             total_seconds = self.timer.total_pomodoro_time
             formatted_time = time.strftime("%H:%M:%S", time.gmtime(total_seconds))
-            self.total_time_label.config(text=f"Total Time:{formatted_time}")
-
+            self.total_time_label.config(text=f"Total Time: {formatted_time}")
+            self.timer.save_state()
         except tk.TclError:
             pass
 
