@@ -2,6 +2,9 @@
 
 This repository contains the code for a Pomodoro Timer application. The application allows users to set a timer for a Pomodoro session and provides options to switch between different modes (Pomodoro, Short Break, and Long Break).
 
+![screenshot](assets/app_screenshot.png)
+**this is screenshot of app v3 on debian 12 bookworm full trail and tested working great**
+
 ## Prerequisites
 
 Before running the application, make sure you have the following installed:
