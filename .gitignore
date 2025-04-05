@@ -129,4 +129,5 @@ assets/rain_sound.mp3
 settings.json
 pomodoro_history.json
 session_state.json
+draft.py
 #give lfs error
